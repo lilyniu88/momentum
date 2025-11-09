@@ -1,25 +1,35 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import {
   View,
   Text,
   StyleSheet,
   Pressable,
   ScrollView,
+  Modal,
   Platform,
 } from 'react-native'
-import { Picker } from '@react-native-picker/picker'
-import { MaterialIcons } from '@expo/vector-icons'
 import Playlist from './Playlist'
 
 function QuickRun() {
   const [distance, setDistance] = useState('')
   const [intensity, setIntensity] = useState('')
   const [showPlaylist, setShowPlaylist] = useState(false)
+  const [showDistanceModal, setShowDistanceModal] = useState(false)
+  const [showIntensityModal, setShowIntensityModal] = useState(false)
 
-  useEffect(() => {
-    console.log('QuickRun component mounted, Platform:', Platform.OS)
-    console.log('App should be visible now')
-  }, [])
+  const distanceOptions = [
+    { label: 'Select Distance', value: '' },
+    { label: 'Short', value: 'short' },
+    { label: 'Medium', value: 'medium' },
+    { label: 'Long', value: 'long' },
+  ]
+
+  const intensityOptions = [
+    { label: 'Select Intensity', value: '' },
+    { label: 'Low', value: 'low' },
+    { label: 'Medium', value: 'medium' },
+    { label: 'High', value: 'high' },
+  ]
 
   const handleStart = () => {
     if (distance && intensity) {
@@ -27,149 +37,111 @@ function QuickRun() {
     }
   }
 
+  const getSelectedLabel = (value, options) => {
+    const option = options.find(opt => opt.value === value)
+    return option ? option.label : options[0].label
+  }
+
   if (showPlaylist) {
     return <Playlist distance={distance} intensity={intensity} />
   }
 
-  console.log('QuickRun rendering, Platform:', Platform.OS)
-
-  // Simple test to ensure component renders
-  if (Platform.OS === 'web') {
-    console.log('Web platform detected')
-  }
+  const renderPickerModal = (options, selectedValue, onSelect, isVisible, onClose) => (
+    <Modal
+      visible={isVisible}
+      transparent={true}
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <Pressable style={styles.modalOverlay} onPress={onClose}>
+        <View style={styles.modalContent}>
+          <ScrollView>
+            {options.map((option) => (
+              <Pressable
+                key={option.value}
+                onPress={() => {
+                  onSelect(option.value)
+                  onClose()
+                }}
+                style={[
+                  styles.modalOption,
+                  selectedValue === option.value && styles.modalOptionSelected
+                ]}
+              >
+                <Text style={[
+                  styles.modalOptionText,
+                  selectedValue === option.value && styles.modalOptionTextSelected
+                ]}>
+                  {option.label}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
+      </Pressable>
+    </Modal>
+  )
 
   return (
-    <View style={styles.app} testID="quick-run-app">
+    <View style={styles.app}>
       <ScrollView 
         style={styles.scrollView} 
         contentContainerStyle={styles.contentContainer}
       >
         <View style={styles.container}>
-          <Text style={styles.title} testID="quick-run-title">
-            Quick Run
-          </Text>
+          <Text style={styles.title}>Quick Run</Text>
           
           <View style={styles.filters}>
             <View style={styles.filterGroup}>
               <Text style={styles.label}>Distance</Text>
-              <View style={styles.pickerContainer}>
-                {Platform.OS === 'web' ? (
-                  <WebPicker
-                    selectedValue={distance}
-                    onValueChange={setDistance}
-                    options={[
-                      { label: 'Select Distance', value: '' },
-                      { label: 'Short', value: 'short' },
-                      { label: 'Medium', value: 'medium' },
-                      { label: 'Long', value: 'long' },
-                    ]}
-                  />
-                ) : (
-                  <Picker
-                    selectedValue={distance}
-                    onValueChange={setDistance}
-                    style={styles.picker}
-                    dropdownIconColor="#5809C0"
-                  >
-                    <Picker.Item label="Select Distance" value="" />
-                    <Picker.Item label="Short" value="short" />
-                    <Picker.Item label="Medium" value="medium" />
-                    <Picker.Item label="Long" value="long" />
-                  </Picker>
-                )}
-              </View>
+              <Pressable
+                style={styles.pickerButton}
+                onPress={() => setShowDistanceModal(true)}
+              >
+                <Text style={styles.pickerButtonText}>
+                  {getSelectedLabel(distance, distanceOptions)}
+                </Text>
+                <Text style={styles.pickerArrow}>▼</Text>
+              </Pressable>
             </View>
 
             <View style={styles.filterGroup}>
               <Text style={styles.label}>Intensity</Text>
-              <View style={styles.pickerContainer}>
-                {Platform.OS === 'web' ? (
-                  <WebPicker
-                    selectedValue={intensity}
-                    onValueChange={setIntensity}
-                    options={[
-                      { label: 'Select Intensity', value: '' },
-                      { label: 'Low', value: 'low' },
-                      { label: 'Medium', value: 'medium' },
-                      { label: 'High', value: 'high' },
-                    ]}
-                  />
-                ) : (
-                  <Picker
-                    selectedValue={intensity}
-                    onValueChange={setIntensity}
-                    style={styles.picker}
-                    dropdownIconColor="#5809C0"
-                  >
-                    <Picker.Item label="Select Intensity" value="" />
-                    <Picker.Item label="Low" value="low" />
-                    <Picker.Item label="Medium" value="medium" />
-                    <Picker.Item label="High" value="high" />
-                  </Picker>
-                )}
-              </View>
+              <Pressable
+                style={styles.pickerButton}
+                onPress={() => setShowIntensityModal(true)}
+              >
+                <Text style={styles.pickerButtonText}>
+                  {getSelectedLabel(intensity, intensityOptions)}
+                </Text>
+                <Text style={styles.pickerArrow}>▼</Text>
+              </Pressable>
             </View>
           </View>
 
           <Pressable 
             onPress={handleStart}
-            style={({ pressed }) => [
-              styles.startButton,
-              pressed && styles.startButtonPressed
-            ]}
+            style={styles.startButton}
           >
             <Text style={styles.startButtonText}>Start</Text>
           </Pressable>
         </View>
       </ScrollView>
-    </View>
-  )
-}
 
-// Web-compatible picker component
-function WebPicker({ selectedValue, onValueChange, options }) {
-  const [isOpen, setIsOpen] = useState(false)
+      {renderPickerModal(
+        distanceOptions,
+        distance,
+        setDistance,
+        showDistanceModal,
+        () => setShowDistanceModal(false)
+      )}
 
-  const selectedOption = options.find(opt => opt.value === selectedValue) || options[0]
-
-  return (
-    <View style={styles.webPickerWrapper}>
-      <Pressable
-        onPress={() => setIsOpen(!isOpen)}
-        style={styles.webPickerButton}
-      >
-        <Text style={styles.webPickerText}>
-          {selectedOption.label}
-        </Text>
-        <MaterialIcons 
-          name={isOpen ? "keyboard-arrow-up" : "keyboard-arrow-down"} 
-          size={24} 
-          color="#5809C0" 
-        />
-      </Pressable>
-      {isOpen && (
-        <View style={styles.webPickerDropdown}>
-          {options.map((option) => (
-            <Pressable
-              key={option.value}
-              onPress={() => {
-                onValueChange(option.value)
-                setIsOpen(false)
-              }}
-              style={[
-                styles.webPickerOption,
-                selectedValue === option.value && styles.webPickerOptionSelected
-              ]}
-            >
-              <Text style={[
-                styles.webPickerOptionText,
-                selectedValue === option.value && styles.webPickerOptionTextSelected
-              ]}>
-                {option.label}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
+      {renderPickerModal(
+        intensityOptions,
+        intensity,
+        setIntensity,
+        showIntensityModal,
+        () => setShowIntensityModal(false)
       )}
     </View>
   )
@@ -178,13 +150,7 @@ function WebPicker({ selectedValue, onValueChange, options }) {
 const styles = StyleSheet.create({
   app: {
     flex: 1,
-    width: '100%',
-    height: '100%',
     backgroundColor: '#FFFFFF',
-    ...(Platform.OS === 'web' && { 
-      minHeight: '100vh',
-      display: 'flex',
-    }),
   },
   scrollView: {
     flex: 1,
@@ -203,14 +169,6 @@ const styles = StyleSheet.create({
     width: '100%',
     borderWidth: 1,
     borderColor: '#EFEFEF',
-    shadowColor: '#5809C0',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 5,
   },
   title: {
     fontSize: 42,
@@ -218,36 +176,40 @@ const styles = StyleSheet.create({
     color: '#5809C0',
     textAlign: 'center',
     marginBottom: 40,
-    letterSpacing: -0.5,
-    fontFamily: Platform.OS === 'web' ? 'Figtree, sans-serif' : undefined,
   },
   filters: {
-    flexDirection: 'column',
-    gap: 24,
     marginBottom: 32,
   },
   filterGroup: {
-    flexDirection: 'column',
-    gap: 8,
+    marginBottom: 24,
   },
   label: {
     fontSize: 14,
     fontWeight: '600',
     color: '#5809C0',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    fontFamily: Platform.OS === 'web' ? 'Figtree, sans-serif' : undefined,
+    marginBottom: 8,
   },
-  pickerContainer: {
+  pickerButton: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     borderWidth: 2,
     borderColor: '#EFEFEF',
     borderRadius: 20,
-    overflow: 'hidden',
     backgroundColor: '#FFFFFF',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    minHeight: 50,
   },
-  picker: {
-    height: 50,
+  pickerButtonText: {
+    fontSize: 16,
     color: '#5809C0',
+    flex: 1,
+  },
+  pickerArrow: {
+    fontSize: 12,
+    color: '#5809C0',
+    marginLeft: 8,
   },
   startButton: {
     width: '100%',
@@ -255,86 +217,45 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
     backgroundColor: '#5809C0',
     borderRadius: 20,
-    shadowColor: '#5809C0',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 7.5,
-    elevation: 8,
-  },
-  startButtonPressed: {
-    backgroundColor: '#7BF0FF',
-    transform: [{ translateY: -2 }],
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   startButtonText: {
     fontSize: 18,
     fontWeight: '600',
     color: '#FFFFFF',
     textAlign: 'center',
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
-    fontFamily: Platform.OS === 'web' ? 'Figtree, sans-serif' : undefined,
   },
-  // Web picker styles
-  webPickerWrapper: {
-    position: 'relative',
-    width: '100%',
-  },
-  webPickerButton: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
     alignItems: 'center',
-    height: 50,
-    paddingHorizontal: 12,
-    backgroundColor: '#FFFFFF',
   },
-  webPickerText: {
-    fontSize: 16,
-    color: '#5809C0',
-    fontFamily: Platform.OS === 'web' ? 'Figtree, sans-serif' : undefined,
-  },
-  webPickerDropdown: {
-    position: 'absolute',
-    top: 50,
-    left: 0,
-    right: 0,
+  modalContent: {
     backgroundColor: '#FFFFFF',
-    borderWidth: 2,
-    borderColor: '#EFEFEF',
-    borderTopWidth: 0,
     borderRadius: 20,
-    borderTopLeftRadius: 0,
-    borderTopRightRadius: 0,
-    zIndex: 1000,
-    shadowColor: '#5809C0',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 5,
+    width: '80%',
+    maxWidth: 400,
+    maxHeight: '60%',
+    padding: 20,
   },
-  webPickerOption: {
-    paddingVertical: 12,
-    paddingHorizontal: 12,
+  modalOption: {
+    paddingVertical: 16,
+    paddingHorizontal: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#EFEFEF',
   },
-  webPickerOptionSelected: {
+  modalOptionSelected: {
     backgroundColor: '#D3C2F7',
   },
-  webPickerOptionText: {
+  modalOptionText: {
     fontSize: 16,
     color: '#5809C0',
-    fontFamily: Platform.OS === 'web' ? 'Figtree, sans-serif' : undefined,
   },
-  webPickerOptionTextSelected: {
+  modalOptionTextSelected: {
     fontWeight: '600',
   },
 })
 
 export default QuickRun
-
