@@ -1,108 +1,115 @@
-import React from 'react'
+import React, { useMemo } from 'react'
 import {
   View,
   Text,
-  StyleSheet,
   ScrollView,
   Pressable,
   FlatList,
   Platform,
 } from 'react-native'
 import { MaterialIcons } from '@expo/vector-icons'
+import { playlistStyles as styles } from './styles'
+import { generatePlaylist } from './services/playlistService'
+
+// All available songs (in a real app, this would come from Spotify API)
+const allSongs = [
+  {
+    id: 1,
+    title: "360",
+    artist: "Charli XCX",
+    bpm: 181,
+    time: "2:14",
+    expectedPace: "6:14",
+    albumArt: "brat"
+  },
+  {
+    id: 2,
+    title: "HUMBLE.",
+    artist: "Kendrick Lamar",
+    bpm: 182,
+    time: "2:57",
+    expectedPace: "6:09",
+    albumArt: "damn"
+  },
+  {
+    id: 3,
+    title: "IS IT",
+    artist: "Tyla",
+    bpm: 189,
+    time: "2:44",
+    expectedPace: "6:08",
+    albumArt: "tyla"
+  },
+  {
+    id: 4,
+    title: "MY HOUSE",
+    artist: "Beyoncé",
+    bpm: 142,
+    time: "4:23",
+    expectedPace: "9:23",
+    albumArt: "beyonce"
+  },
+  {
+    id: 5,
+    title: "DNA.",
+    artist: "Kendrick Lamar",
+    bpm: 140,
+    time: "3:06",
+    expectedPace: "9:42",
+    albumArt: "damn"
+  },
+  {
+    id: 6,
+    title: "365",
+    artist: "Charli XCX",
+    bpm: 181,
+    time: "2:18",
+    expectedPace: "6:12",
+    albumArt: "brat"
+  },
+  {
+    id: 7,
+    title: "Party in the U.S.A.",
+    artist: "Miley Cyrus",
+    bpm: 100,
+    time: "3:22",
+    expectedPace: "10:00",
+    albumArt: "miley"
+  },
+  {
+    id: 8,
+    title: "Fireball",
+    artist: "Pitbull",
+    bpm: 128,
+    time: "3:24",
+    expectedPace: "8:00",
+    albumArt: "pitbull"
+  },
+  {
+    id: 9,
+    title: "Good as Hell",
+    artist: "Lizzo",
+    bpm: 120,
+    time: "2:39",
+    expectedPace: "8:30",
+    albumArt: "lizzo"
+  },
+  {
+    id: 10,
+    title: "Levitating",
+    artist: "Dua Lipa",
+    bpm: 103,
+    time: "3:23",
+    expectedPace: "9:45",
+    albumArt: "dua"
+  }
+]
 
 function Playlist({ distance, intensity }) {
-  const songs = [
-    {
-      id: 1,
-      title: "360",
-      artist: "Charli XCX",
-      bpm: 181,
-      time: "2:14",
-      expectedPace: "6:14",
-      albumArt: "brat"
-    },
-    {
-      id: 2,
-      title: "HUMBLE.",
-      artist: "Kendrick Lamar",
-      bpm: 182,
-      time: "2:57",
-      expectedPace: "6:09",
-      albumArt: "damn"
-    },
-    {
-      id: 3,
-      title: "IS IT",
-      artist: "Tyla",
-      bpm: 189,
-      time: "2:44",
-      expectedPace: "6:08",
-      albumArt: "tyla"
-    },
-    {
-      id: 4,
-      title: "MY HOUSE",
-      artist: "Beyoncé",
-      bpm: 142,
-      time: "4:23",
-      expectedPace: "9:23",
-      albumArt: "beyonce"
-    },
-    {
-      id: 5,
-      title: "DNA.",
-      artist: "Kendrick Lamar",
-      bpm: 140,
-      time: "3:06",
-      expectedPace: "9:42",
-      albumArt: "damn"
-    },
-    {
-      id: 6,
-      title: "365",
-      artist: "Charli XCX",
-      bpm: 181,
-      time: "2:18",
-      expectedPace: "6:12",
-      albumArt: "brat"
-    },
-    {
-      id: 7,
-      title: "Party in the U.S.A.",
-      artist: "Miley Cyrus",
-      bpm: 100,
-      time: "3:22",
-      expectedPace: "10:00",
-      albumArt: "miley"
-    },
-    {
-      id: 8,
-      title: "Fireball",
-      artist: "Pitbull",
-      bpm: 128,
-      time: "3:24",
-      expectedPace: "8:00",
-      albumArt: "pitbull"
-    },
-    {
-      id: 9,
-      title: "Good as Hell",
-      artist: "Lizzo",
-      bpm: 120,
-      time: "2:39",
-      expectedPace: "8:30",
-      albumArt: "lizzo"
-    },
-    {
-      id: 10,
-      title: "Levitating",
-      artist: "Dua Lipa",
-      bpm: 103,
-      time: "3:23",
-      expectedPace: "9:45",
-      albumArt: "dua"
-    }
-  ]
+  // Generate filtered playlist based on distance and intensity preferences
+  const songs = useMemo(() => {
+    return generatePlaylist(allSongs, distance, intensity)
+  }, [distance, intensity])
 
   const getAlbumArtText = (albumArt) => {
     const map = {
@@ -155,7 +162,7 @@ function Playlist({ distance, intensity }) {
           </View>
         </View>
         <Text style={styles.trackBpmCol}>{song.bpm}</Text>
-        <Text style={styles.trackTimeCol}>{song.time} min</Text>
+        <Text style={styles.trackTimeCol}>{song.time}</Text>
         <Text style={styles.trackPaceCol}>{song.expectedPace} min/mi</Text>
       </View>
     )
@@ -166,6 +173,29 @@ function Playlist({ distance, intensity }) {
     return sum + min * 60 + sec
   }, 0)
   const totalMinutes = Math.floor(totalTime / 60)
+
+  // Get unique artists from filtered songs
+  const uniqueArtists = [...new Set(songs.map(song => song.artist))]
+  const artistList = uniqueArtists.length > 0 
+    ? uniqueArtists.slice(0, 4).join(', ') + (uniqueArtists.length > 4 ? ', and more' : '')
+    : 'No songs available'
+
+  // Generate playlist title based on filters
+  const getPlaylistTitle = () => {
+    const intensityLabels = {
+      low: 'EASY',
+      medium: 'MODERATE',
+      high: 'INTENSE'
+    }
+    const distanceLabels = {
+      short: 'SHORT',
+      medium: 'MEDIUM',
+      long: 'LONG'
+    }
+    const intensityLabel = intensityLabels[intensity] || 'RUN'
+    const distanceLabel = distanceLabels[distance] || 'RUN'
+    return `${intensityLabel} ${distanceLabel} MIX`
+  }
 
   return (
     <View style={styles.playlistPage}>
@@ -199,9 +229,9 @@ function Playlist({ distance, intensity }) {
             </View>
 
             <View style={styles.playlistDetails}>
-              <Text style={styles.playlistTitle}>INTERVAL SPRINT MIX</Text>
+              <Text style={styles.playlistTitle}>{getPlaylistTitle()}</Text>
               <Text style={styles.playlistArtists}>
-                Charli XCX, Pitbull, Kendrick Lamar, Beyoncé, and more
+                {artistList}
               </Text>
               <Text style={styles.playlistSummary}>
                 {songs.length} songs, {totalMinutes} min
@@ -278,252 +308,6 @@ function Playlist({ distance, intensity }) {
     </View>
   )
 }
-
-const styles = StyleSheet.create({
-  playlistPage: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    ...(Platform.OS === 'web' && { minHeight: '100vh' }),
-  },
-  scrollView: {
-    flex: 1,
-  },
-  statusBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    backgroundColor: '#FFFFFF',
-  },
-  time: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#5809C0',
-    fontFamily: Platform.OS === 'web' ? 'Figtree, sans-serif' : undefined,
-  },
-  statusIcons: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  playlistHeader: {
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#EFEFEF',
-  },
-  playlistInfoSection: {
-    flexDirection: 'row',
-    gap: 20,
-    marginTop: 20,
-  },
-  albumArtGrid: {
-    width: 120,
-    height: 120,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 4,
-  },
-  albumArt: {
-    width: '48%',
-    height: '48%',
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  albumArtText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#FFFFFF',
-    fontFamily: Platform.OS === 'web' ? 'Oswald, sans-serif' : undefined,
-  },
-  albumArtTextDark: {
-    color: '#000000',
-  },
-  playlistDetails: {
-    flex: 1,
-    gap: 8,
-  },
-  playlistTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#000000',
-    lineHeight: 28.8,
-    fontFamily: Platform.OS === 'web' ? 'Figtree, sans-serif' : undefined,
-  },
-  playlistArtists: {
-    fontSize: 14,
-    color: '#000000',
-    fontFamily: Platform.OS === 'web' ? 'Figtree, sans-serif' : undefined,
-  },
-  playlistSummary: {
-    fontSize: 14,
-    color: '#000000',
-    marginBottom: 8,
-    fontFamily: Platform.OS === 'web' ? 'Figtree, sans-serif' : undefined,
-  },
-  actionButtonsRow: {
-    flexDirection: 'row',
-    gap: 16,
-    marginTop: 8,
-  },
-  actionIconBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#EFEFEF',
-    backgroundColor: '#FFFFFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  quickStartSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginTop: 16,
-  },
-  quickStartText: {
-    fontSize: 14,
-    color: '#000000',
-    fontWeight: '500',
-    fontFamily: Platform.OS === 'web' ? 'Figtree, sans-serif' : undefined,
-  },
-  playControls: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  playButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#5809C0',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  chooseRouteButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    backgroundColor: '#5809C0',
-    borderRadius: 20,
-  },
-  chooseRouteText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#FFFFFF',
-    fontFamily: Platform.OS === 'web' ? 'Figtree, sans-serif' : undefined,
-  },
-  playlistTracks: {
-    padding: 20,
-  },
-  trackTableHeader: {
-    flexDirection: 'row',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#EFEFEF',
-  },
-  headerCol: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#5809C0',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    fontFamily: Platform.OS === 'web' ? 'Figtree, sans-serif' : undefined,
-  },
-  titleCol: {
-    flex: 2,
-  },
-  bpmCol: {
-    flex: 0.8,
-  },
-  timeCol: {
-    flex: 0.8,
-  },
-  paceCol: {
-    flex: 1,
-  },
-  trackRow: {
-    flexDirection: 'row',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#EFEFEF',
-    alignItems: 'center',
-  },
-  trackTitleCol: {
-    flex: 2,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  trackThumbnail: {
-    width: 48,
-    height: 48,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  thumbnailText: {
-    fontSize: 10,
-    fontWeight: '600',
-    fontFamily: Platform.OS === 'web' ? 'Oswald, sans-serif' : undefined,
-  },
-  trackInfo: {
-    flex: 1,
-    gap: 4,
-  },
-  trackName: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: '#000000',
-    fontFamily: Platform.OS === 'web' ? 'Oswald, sans-serif' : undefined,
-  },
-  trackArtist: {
-    fontSize: 14,
-    color: '#000000',
-    opacity: 0.7,
-    fontFamily: Platform.OS === 'web' ? 'Figtree, sans-serif' : undefined,
-  },
-  trackBpmCol: {
-    flex: 0.8,
-    fontSize: 14,
-    color: '#000000',
-    fontFamily: Platform.OS === 'web' ? 'Figtree, sans-serif' : undefined,
-  },
-  trackTimeCol: {
-    flex: 0.8,
-    fontSize: 14,
-    color: '#000000',
-    fontFamily: Platform.OS === 'web' ? 'Figtree, sans-serif' : undefined,
-  },
-  trackPaceCol: {
-    flex: 1,
-    fontSize: 14,
-    color: '#000000',
-    fontFamily: Platform.OS === 'web' ? 'Figtree, sans-serif' : undefined,
-  },
-  navBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#EFEFEF',
-    backgroundColor: '#FFFFFF',
-  },
-  navItem: {
-    alignItems: 'center',
-    gap: 4,
-  },
-  navLabel: {
-    fontSize: 14,
-    color: '#EFEFEF',
-    fontFamily: Platform.OS === 'web' ? 'Figtree, sans-serif' : undefined,
-  },
-  navLabelActive: {
-    color: '#5809C0',
-  },
-})
 
 export default Playlist
 
