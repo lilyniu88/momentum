@@ -30,6 +30,7 @@ export const quickRunStyles = StyleSheet.create({
     color: '#5809C0',
     textAlign: 'center',
     marginBottom: 40,
+    fontFamily: Platform.OS === 'web' ? 'Figtree, sans-serif' : undefined,
   },
   filters: {
     marginBottom: 32,
@@ -42,6 +43,7 @@ export const quickRunStyles = StyleSheet.create({
     fontWeight: '600',
     color: '#5809C0',
     marginBottom: 8,
+    fontFamily: Platform.OS === 'web' ? 'Figtree, sans-serif' : undefined,
   },
   pickerButton: {
     flexDirection: 'row',
@@ -59,6 +61,7 @@ export const quickRunStyles = StyleSheet.create({
     fontSize: 16,
     color: '#5809C0',
     flex: 1,
+    fontFamily: Platform.OS === 'web' ? 'Figtree, sans-serif' : undefined,
   },
   pickerArrow: {
     fontSize: 12,
@@ -79,6 +82,7 @@ export const quickRunStyles = StyleSheet.create({
     fontWeight: '600',
     color: '#FFFFFF',
     textAlign: 'center',
+    fontFamily: Platform.OS === 'web' ? 'Figtree, sans-serif' : undefined,
   },
   modalOverlay: {
     flex: 1,
@@ -106,6 +110,7 @@ export const quickRunStyles = StyleSheet.create({
   modalOptionText: {
     fontSize: 16,
     color: '#5809C0',
+    fontFamily: Platform.OS === 'web' ? 'Figtree, sans-serif' : undefined,
   },
   modalOptionTextSelected: {
     fontWeight: '600',
@@ -165,7 +170,7 @@ export const playlistStyles = StyleSheet.create({
     alignItems: 'center',
   },
   albumArtText: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '600',
     color: '#FFFFFF',
     fontFamily: Platform.OS === 'web' ? 'Oswald, sans-serif' : undefined,
@@ -203,7 +208,7 @@ export const playlistStyles = StyleSheet.create({
   actionIconBtn: {
     width: 32,
     height: 32,
-    borderRadius: 16,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: '#EFEFEF',
     backgroundColor: '#FFFFFF',
@@ -230,7 +235,7 @@ export const playlistStyles = StyleSheet.create({
   playButton: {
     width: 48,
     height: 48,
-    borderRadius: 24,
+    borderRadius: 20,
     backgroundColor: '#5809C0',
     justifyContent: 'center',
     alignItems: 'center',
@@ -257,7 +262,7 @@ export const playlistStyles = StyleSheet.create({
     borderBottomColor: '#EFEFEF',
   },
   headerCol: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '600',
     color: '#5809C0',
     textTransform: 'uppercase',
@@ -297,7 +302,7 @@ export const playlistStyles = StyleSheet.create({
     alignItems: 'center',
   },
   thumbnailText: {
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '600',
     fontFamily: Platform.OS === 'web' ? 'Oswald, sans-serif' : undefined,
   },
