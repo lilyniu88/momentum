@@ -1,5 +1,7 @@
 {
-  "name": "momentum",
-  "displayName": "Momentum"
+  "expo": {
+    "name": "momentum",
+    "slug": "momentum"
+  }
 }
 

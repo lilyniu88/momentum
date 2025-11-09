@@ -1,6 +1,5 @@
-import { AppRegistry } from 'react-native'
-import QuickRun from './src/QuickRun'
-import { name as appName } from './app.json'
+import { registerRootComponent } from 'expo';
+import QuickRun from './src/QuickRun';
 
-AppRegistry.registerComponent(appName, () => QuickRun)
+registerRootComponent(QuickRun);
 
