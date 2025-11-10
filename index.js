@@ -3,5 +3,5 @@ import QuickRun from './src/QuickRun';
 import SpotifyPage from './src/SpotifyPage';
 import SpotifyPublicPage from './src/SpotifyPublicPage';
 
-registerRootComponent(QuickRun);
+registerRootComponent(SpotifyPublicPage);
 

@@ -29,7 +29,7 @@ export default function useSpotifyPublic() {
     }
   };
 
-  // Fetch a public playlist (example)
+  // Fetch a public album (from Spotify's API)
   const fetchPublicPlaylist = async () => {
     if (!token) return;
     setLoading(true);
