@@ -3,13 +3,14 @@ import {
   View,
   Text,
   Pressable,
-  Platform,
   ActivityIndicator,
+  Image,
 } from 'react-native'
 import { MaterialIcons } from '@expo/vector-icons'
 import MapView from 'react-native-maps'
 import * as Location from 'expo-location'
 import { runningPageStyles as styles } from './styles'
+import { getAlbumCoverArt, startPlayback, pausePlayback, skipToNext } from './services/spotifyApi'
 
 // Helper function for time formatting
 const formatTime = (totalSeconds) => {
@@ -159,7 +160,6 @@ const useLocation = (isWorkoutPaused) => {
         })
         setIsLoading(false)
       } catch (error) {
-        console.error('Error getting location:', error)
         setErrorMsg('Error getting location')
         setIsLoading(false)
         // Set default location on error
@@ -201,7 +201,7 @@ const useLocation = (isWorkoutPaused) => {
         )
         locationSubscriptionRef.current = subscription
       } catch (error) {
-        console.error('Error setting up location tracking:', error)
+        // Location tracking failed
       }
     }
 
@@ -222,70 +222,51 @@ const useLocation = (isWorkoutPaused) => {
   return { location, errorMsg, isLoading }
 }
 
-// Helper function for parsing time (not currently used, but kept for reference)
-const parseTime = (timeString) => {
-  const parts = timeString.split(':')
-  return parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 + parseInt(parts[2])
-}
 
-// Helper functions for album art (same as Playlist component)
-const getAlbumArtText = (albumArt) => {
-  const map = {
-    'brat': 'brat',
-    'damn': 'DAMN.',
-    'tyla': 'T',
-    'beyonce': 'B',
-    'miley': 'M',
-    'pitbull': 'P',
-    'lizzo': 'L',
-    'dua': 'D'
-  }
-  return map[albumArt] || 'A'
-}
-
-const getAlbumArtColor = (albumArt) => {
-  const map = {
-    'brat': '#22c55e',
-    'damn': '#e5e7eb',
-    'tyla': '#fbbf24',
-    'beyonce': '#1a1a1a',
-    'miley': '#fef3c7',
-    'pitbull': '#5809C0',
-    'lizzo': '#7BF0FF',
-    'dua': '#D3C2F7'
-  }
-  return map[albumArt] || '#EFEFEF'
-}
-
-const getAlbumArtTextColor = (albumArt) => {
-  const darkBackgrounds = ['damn', 'beyonce', 'pitbull']
-  return darkBackgrounds.includes(albumArt) ? '#FFFFFF' : '#000000'
-}
-
-// Helper function to calculate distance between two GPS coordinates (Haversine formula)
-const calculateDistance = (lat1, lon1, lat2, lon2) => {
-  const R = 6371000 // Earth's radius in meters
-  const dLat = (lat2 - lat1) * Math.PI / 180
-  const dLon = (lon2 - lon1) * Math.PI / 180
-  const a = 
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLon / 2) * Math.sin(dLon / 2)
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-  return R * c
-}
-
-function RunningPage({ playlistTitle, currentSong, onStop, onPause, onSkip }) {
+function RunningPage({ playlistTitle, currentSong, currentSongIndex = 0, allSongs = [], onStop, onPause, onSkip }) {
   const [isWorkoutPaused, setIsWorkoutPaused] = useState(false)
   const [isSongPaused, setIsSongPaused] = useState(false)
+  const [albumImageUrl, setAlbumImageUrl] = useState(null)
   const { location, errorMsg, isLoading } = useLocation(isWorkoutPaused)
   const workoutData = useWorkoutData(isWorkoutPaused, location)
 
-  const handleSongPause = () => {
-    setIsSongPaused(!isSongPaused)
-    // TODO: Implement song playback pause/play functionality
-    // This would control the actual music playback
-    console.log('Song paused:', !isSongPaused)
+  // Fetch album cover art when current song changes
+  useEffect(() => {
+    const fetchAlbumArt = async () => {
+      if (currentSong?.albumImageUrl) {
+        setAlbumImageUrl(currentSong.albumImageUrl)
+      } else if (currentSong?.albumId) {
+        try {
+          const imageUrl = await getAlbumCoverArt(currentSong.albumId)
+          setAlbumImageUrl(imageUrl)
+        } catch (error) {
+          setAlbumImageUrl(null)
+        }
+      } else {
+        setAlbumImageUrl(null)
+      }
+    }
+    
+    fetchAlbumArt()
+  }, [currentSong?.albumId, currentSong?.albumImageUrl])
+
+  // Don't queue playlist here - it's already queued in Playlist.jsx handlePlay
+  // This component just displays the current song and handles skip/pause
+
+  const handleSongPause = async () => {
+    const newPausedState = !isSongPaused
+    setIsSongPaused(newPausedState)
+    
+    try {
+      if (newPausedState) {
+        await pausePlayback()
+      } else {
+        // Resume playback - Spotify will continue from where it paused in the queue
+        await startPlayback({})
+      }
+    } catch (error) {
+      setIsSongPaused(!newPausedState)
+    }
   }
 
   const handleWorkoutPause = () => {
@@ -297,13 +278,35 @@ function RunningPage({ playlistTitle, currentSong, onStop, onPause, onSkip }) {
     if (onStop) onStop()
   }
 
-  const handleSkip = () => {
-    if (onSkip) onSkip()
+  const handleSkip = async () => {
+    try {
+      // Calculate the next index based on the current index from parent
+      const nextIndex = (currentSongIndex + 1) % allSongs.length
+      const nextSong = allSongs[nextIndex]
+      
+      // Update the index in the parent component (this updates the UI)
+      if (onSkip) onSkip()
+      
+      // Play the next song from our generated playlist
+      if (nextSong?.spotifyUri) {
+        const allUris = allSongs
+          .map(song => song.spotifyUri)
+          .filter(Boolean)
+        
+        // Play from our playlist starting at the next song
+        await startPlayback({
+          uris: allUris,
+          offset: { position: nextIndex },
+          positionMs: 0,
+        })
+      }
+    } catch (error) {
+      // Continue even if playback fails
+    }
   }
 
-  const albumArt = currentSong?.albumArt || 'brat'
-  const albumArtColor = getAlbumArtColor(albumArt)
-  const albumArtTextColor = getAlbumArtTextColor(albumArt)
+  const albumArtColor = '#EFEFEF'
+  const albumArtTextColor = '#000000'
 
   return (
     <View style={styles.container}>
@@ -312,10 +315,18 @@ function RunningPage({ playlistTitle, currentSong, onStop, onPause, onSkip }) {
         <Text style={styles.playlistTitle}>{playlistTitle}</Text>
         
         <View style={styles.currentSongSection}>
-          <View style={[styles.albumArtSmall, { backgroundColor: albumArtColor }]}>
-            <Text style={[styles.albumArtTextSmall, { color: albumArtTextColor }]}>
-              {getAlbumArtText(albumArt)}
-            </Text>
+          <View style={[styles.albumArtSmall, { backgroundColor: albumArtColor, overflow: 'hidden' }]}>
+            {albumImageUrl ? (
+              <Image 
+                source={{ uri: albumImageUrl }} 
+                style={{ width: '100%', height: '100%' }}
+                resizeMode="cover"
+              />
+            ) : (
+              <Text style={[styles.albumArtTextSmall, { color: albumArtTextColor }]}>
+                {currentSong?.title?.charAt(0)?.toUpperCase() || '♪'}
+              </Text>
+            )}
           </View>
           <View style={styles.songInfo}>
             <View style={styles.songTitleRow}>

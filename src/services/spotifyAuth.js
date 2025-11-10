@@ -1,6 +1,5 @@
 import * as AuthSession from 'expo-auth-session';
 import * as SecureStore from 'expo-secure-store';
-import { Platform } from 'react-native';
 
 // Get CLIENT_ID from environment
 // Use EXPO_PUBLIC_ prefix for Expo to expose it to the client
@@ -42,12 +41,6 @@ const getRedirectUri = () => {
   });
   
   cachedRedirectUri = redirectUri;
-  
-  // Log the redirect URI for debugging
-  console.log('Spotify Redirect URI:', redirectUri);
-  console.log('Make sure this exact URI is added to your Spotify Dashboard!');
-  console.log('If you see exp://, you need to add that EXACT URI to Spotify Dashboard');
-  
   return redirectUri;
 };
 
@@ -57,33 +50,21 @@ const getRedirectUri = () => {
 const useAuthRequest = () => {
   const redirectUri = getRedirectUri();
   
-  console.log('Creating auth request with redirect URI:', redirectUri);
-  console.log('IMPORTANT: This EXACT URI must be in your Spotify Dashboard redirect URIs list!');
-  
   const [request, response, promptAsync] = AuthSession.useAuthRequest(
     {
       responseType: AuthSession.ResponseType.Code,
       clientId: SPOTIFY_CLIENT_ID,
       scopes: [
-        'user-top-read',        // Required for /me/top/tracks
-        'user-read-private',    // Optional but useful
+        'user-top-read',              // Required for /me/top/tracks
+        'user-read-private',          // Optional but useful
+        'user-modify-playback-state',  // Required for controlling playback
+        'user-read-playback-state',   // Required for reading playback state and devices
       ],
       usePKCE: true,
       redirectUri,
     },
     discovery
   );
-  
-  // Log the actual redirect URI from the request object (might differ)
-  if (request) {
-    console.log('Request object redirect URI:', request.redirectUri);
-    if (request.redirectUri !== redirectUri) {
-      console.warn('WARNING: Request redirect URI differs from generated URI!');
-      console.warn('Generated:', redirectUri);
-      console.warn('Request:', request.redirectUri);
-      console.warn('You MUST use the Request redirect URI in token exchange!');
-    }
-  }
   
   return [request, response, promptAsync];
 };
@@ -95,11 +76,7 @@ const useAuthRequest = () => {
  * @param {string} redirectUri - The EXACT redirect URI used in the auth request (must match!)
  */
 const exchangeCodeForTokens = async (code, codeVerifier, redirectUri) => {
-  // Use the provided redirectUri (from the request) to ensure exact match
   const uriToUse = redirectUri || getRedirectUri();
-  
-  console.log('Token exchange - Using redirect URI:', uriToUse);
-  console.log('This MUST match the redirect URI used in the authorization request!');
   
   try {
     const response = await fetch(discovery.tokenEndpoint, {
@@ -247,9 +224,18 @@ const getValidAccessToken = async () => {
       return newTokens.accessToken;
     } catch (error) {
       console.error('Failed to refresh token:', error);
-      // Clear invalid tokens
-      await clearTokens();
-      return null;
+      // Only clear tokens if refresh token is invalid (400) or unauthorized (401)
+      // Network errors or other issues shouldn't clear tokens - user can retry
+      if (error.message.includes('400') || 
+          error.message.includes('401') || 
+          error.message.includes('invalid_grant') ||
+          error.message.includes('invalid_request')) {
+        console.error('Refresh token is invalid, clearing tokens');
+        await clearTokens();
+        return null;
+      } else {
+        return null;
+      }
     }
   }
   
