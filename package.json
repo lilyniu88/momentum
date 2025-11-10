@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "android": "react-native run-android",
-    "ios": "react-native run-ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "start": "react-native start",
     "expo": "expo start",
     "web": "expo start --web",
@@ -16,9 +16,12 @@
     "@expo/vector-icons": "^15.0.3",
     "@react-native-picker/picker": "2.11.1",
     "expo": "~54.0.0",
+    "expo-location": "~19.0.7",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-native": "0.81.5",
+    "react-native-health": "^1.19.0",
+    "react-native-maps": "1.20.1",
     "react-native-vector-icons": "^10.0.0",
     "react-native-web": "^0.21.0",
     "undefined": "https://github.com/lilyniu88/momentum.git"

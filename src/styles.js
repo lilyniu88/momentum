@@ -118,6 +118,7 @@ export const playlistStyles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFFFF',
     ...(Platform.OS === 'web' && { minHeight: '100vh' }),
+    ...(Platform.OS !== 'web' && { paddingTop: 20 }),
   },
   scrollView: {
     flex: 1,
@@ -356,6 +357,168 @@ export const playlistStyles = StyleSheet.create({
   },
   navLabelActive: {
     color: '#5809C0',
+  },
+})
+
+// Running Page Component Styles
+export const runningPageStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  topSection: {
+    paddingTop: Platform.OS !== 'web' ? 50 : 20,
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    ...(Platform.OS !== 'web' && { marginTop: 20 }),
+  },
+  playlistTitle: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: '#000000',
+    marginBottom: 12,
+    fontFamily: Platform.OS === 'web' ? 'Oswald, sans-serif' : undefined,
+  },
+  currentSongSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    gap: 12,
+  },
+  albumArtSmall: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  albumArtTextSmall: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#000000',
+    fontFamily: Platform.OS === 'web' ? 'Oswald, sans-serif' : undefined,
+  },
+  songInfo: {
+    flex: 1,
+  },
+  songTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#000000',
+    fontFamily: Platform.OS === 'web' ? 'Oswald, sans-serif' : undefined,
+  },
+  songArtist: {
+    fontSize: 14,
+    color: '#000000',
+    opacity: 0.7,
+    fontFamily: Platform.OS === 'web' ? 'Figtree, sans-serif' : undefined,
+  },
+  metricsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  metricsColumn: {
+    gap: 8,
+  },
+  metricLabel: {
+    fontSize: 14,
+    color: '#000000',
+    fontFamily: Platform.OS === 'web' ? 'Figtree, sans-serif' : undefined,
+  },
+  motivationalText: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#5809C0',
+    flex: 1,
+    textAlign: 'center',
+    fontFamily: Platform.OS === 'web' ? 'Figtree, sans-serif' : undefined,
+  },
+  topControls: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  controlButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: '#5809C0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  mapSection: {
+    flex: 1,
+    backgroundColor: '#EFEFEF',
+    marginHorizontal: 20,
+    marginBottom: 20,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  map: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+  },
+  mapPlaceholder: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F5F5F5',
+    padding: 20,
+  },
+  mapPlaceholderText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#000000',
+    marginBottom: 8,
+    fontFamily: Platform.OS === 'web' ? 'Figtree, sans-serif' : undefined,
+  },
+  mapPlaceholderSubtext: {
+    fontSize: 14,
+    color: '#666666',
+    marginBottom: 4,
+    fontFamily: Platform.OS === 'web' ? 'Figtree, sans-serif' : undefined,
+  },
+  mapPlaceholderNote: {
+    fontSize: 12,
+    color: '#999999',
+    fontStyle: 'italic',
+    textAlign: 'center',
+    fontFamily: Platform.OS === 'web' ? 'Figtree, sans-serif' : undefined,
+  },
+  bottomSection: {
+    paddingHorizontal: 20,
+    paddingBottom: Platform.OS !== 'web' ? 30 : 20,
+  },
+  performanceMetrics: {
+    flexDirection: Platform.OS === 'web' ? 'row' : 'column',
+    justifyContent: 'space-around',
+    marginBottom: 20,
+    gap: Platform.OS !== 'web' ? 12 : 0,
+    alignItems: Platform.OS !== 'web' ? 'flex-start' : 'center',
+  },
+  performanceMetric: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#5809C0',
+    fontFamily: Platform.OS === 'web' ? 'Oswald, sans-serif' : undefined,
+  },
+  bottomControls: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 24,
+  },
+  bottomControlButton: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: '#5809C0',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 })
 

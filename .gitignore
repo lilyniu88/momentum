@@ -50,6 +50,9 @@ Thumbs.db
 
 # Build artifacts
 build/
+ios/build/
+ios/Pods/
+ios/Podfile.lock
 *.log
 
 # Temporary files

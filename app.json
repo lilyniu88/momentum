@@ -1,7 +1,44 @@
 {
   "expo": {
     "name": "momentum",
-    "slug": "momentum"
+    "slug": "momentum",
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow Momentum to use your location to track your runs and show your position on the map."
+        }
+      ],
+      [
+        "react-native-health",
+        {
+          "healthSharePermission": "Allow Momentum to read your health data to track distance, steps, and heart rate during your runs.",
+          "healthUpdatePermission": "Allow Momentum to save workout data to HealthKit."
+        }
+      ]
+    ],
+    "ios": {
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Allow Momentum to use your location to track your runs and show your position on the map.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Allow Momentum to use your location to track your runs and show your position on the map.",
+        "NSHealthShareUsageDescription": "Allow Momentum to read your health data to track distance, steps, and heart rate during your runs.",
+        "NSHealthUpdateUsageDescription": "Allow Momentum to save workout data to HealthKit."
+      },
+      "bundleIdentifier": "com.anonymous.momentum"
+    },
+    "android": {
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ],
+      "package": "com.anonymous.momentum"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "3e88dfe1-772c-4078-a950-41abe8cb177c"
+      }
+    }
   }
 }
-
