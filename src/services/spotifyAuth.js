@@ -24,16 +24,29 @@ const TOKEN_EXPIRY_KEY = 'spotify_token_expiry';
 
 /**
  * Get redirect URI for OAuth
+ * For Expo Go, we need to use the proxy which provides a stable URL
  */
+let cachedRedirectUri = null;
+
 const getRedirectUri = () => {
+  // Cache the redirect URI so it's consistent across calls
+  if (cachedRedirectUri) {
+    return cachedRedirectUri;
+  }
+  
+  // For Expo Go, useProxy: true gives us a stable proxy URL
+  // For standalone builds, it will use the native scheme
   const redirectUri = AuthSession.makeRedirectUri({
     useProxy: true,
     native: 'momentum://redirect',
   });
   
+  cachedRedirectUri = redirectUri;
+  
   // Log the redirect URI for debugging
   console.log('Spotify Redirect URI:', redirectUri);
   console.log('Make sure this exact URI is added to your Spotify Dashboard!');
+  console.log('If you see exp://, you need to add that EXACT URI to Spotify Dashboard');
   
   return redirectUri;
 };
@@ -44,23 +57,49 @@ const getRedirectUri = () => {
 const useAuthRequest = () => {
   const redirectUri = getRedirectUri();
   
-  return AuthSession.useAuthRequest(
+  console.log('Creating auth request with redirect URI:', redirectUri);
+  console.log('IMPORTANT: This EXACT URI must be in your Spotify Dashboard redirect URIs list!');
+  
+  const [request, response, promptAsync] = AuthSession.useAuthRequest(
     {
       responseType: AuthSession.ResponseType.Code,
       clientId: SPOTIFY_CLIENT_ID,
-      scopes: ['user-top-read', 'user-read-private'],
+      scopes: [
+        'user-top-read',        // Required for /me/top/tracks
+        'user-read-private',    // Optional but useful
+      ],
       usePKCE: true,
       redirectUri,
     },
     discovery
   );
+  
+  // Log the actual redirect URI from the request object (might differ)
+  if (request) {
+    console.log('Request object redirect URI:', request.redirectUri);
+    if (request.redirectUri !== redirectUri) {
+      console.warn('WARNING: Request redirect URI differs from generated URI!');
+      console.warn('Generated:', redirectUri);
+      console.warn('Request:', request.redirectUri);
+      console.warn('You MUST use the Request redirect URI in token exchange!');
+    }
+  }
+  
+  return [request, response, promptAsync];
 };
 
 /**
  * Exchange authorization code for tokens
+ * @param {string} code - Authorization code from OAuth response
+ * @param {string} codeVerifier - PKCE code verifier
+ * @param {string} redirectUri - The EXACT redirect URI used in the auth request (must match!)
  */
-const exchangeCodeForTokens = async (code, codeVerifier) => {
-  const redirectUri = getRedirectUri();
+const exchangeCodeForTokens = async (code, codeVerifier, redirectUri) => {
+  // Use the provided redirectUri (from the request) to ensure exact match
+  const uriToUse = redirectUri || getRedirectUri();
+  
+  console.log('Token exchange - Using redirect URI:', uriToUse);
+  console.log('This MUST match the redirect URI used in the authorization request!');
   
   try {
     const response = await fetch(discovery.tokenEndpoint, {
@@ -71,7 +110,7 @@ const exchangeCodeForTokens = async (code, codeVerifier) => {
       body: new URLSearchParams({
         grant_type: 'authorization_code',
         code,
-        redirect_uri: redirectUri,
+        redirect_uri: uriToUse,
         client_id: SPOTIFY_CLIENT_ID,
         code_verifier: codeVerifier,
       }).toString(),

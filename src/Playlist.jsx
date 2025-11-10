@@ -20,6 +20,7 @@ import {
   isAuthenticated,
   getValidAccessToken,
   clearTokens,
+  getRedirectUri,
 } from './services/spotifyAuth'
 import { fetchTopTracksWithFeatures } from './services/spotifyApi'
 
@@ -181,7 +182,11 @@ function Playlist({ distance, intensity }) {
       setIsLoadingSpotify(true)
       setAuthError(null)
       
-      const tokens = await exchangeCodeForTokens(code, codeVerifier)
+      // Use the EXACT redirect URI from the request to ensure it matches
+      const redirectUri = request?.redirectUri || getRedirectUri()
+      console.log('Using redirect URI for token exchange:', redirectUri)
+      
+      const tokens = await exchangeCodeForTokens(code, codeVerifier, redirectUri)
       await saveTokens(tokens.accessToken, tokens.refreshToken, tokens.expiresIn)
       
       setAuthReady(true)
@@ -204,7 +209,8 @@ function Playlist({ distance, intensity }) {
         limit: 50,
       })
       
-      setSpotifySongs(tracks)
+      console.log(`✅ Loaded ${tracks?.length || 0} tracks from Spotify`)
+      setSpotifySongs(tracks || [])
       setIsLoadingSpotify(false)
     } catch (error) {
       console.error('Error fetching Spotify tracks:', error)
@@ -245,8 +251,29 @@ function Playlist({ distance, intensity }) {
 
   // Generate filtered playlist based on distance and intensity preferences
   const songs = useMemo(() => {
-    return generatePlaylist(availableSongs, distance, intensity)
-  }, [availableSongs, distance, intensity])
+    console.log('Generating playlist:', {
+      availableSongsCount: availableSongs.length,
+      distance,
+      intensity,
+      isSpotify: spotifySongs.length > 0
+    })
+    
+    const filtered = generatePlaylist(availableSongs, distance, intensity)
+    
+    console.log('Filtered playlist result:', {
+      filteredCount: filtered.length,
+      originalCount: availableSongs.length
+    })
+    
+    // If filtering removed all Spotify tracks (because they all have default BPM 120),
+    // return them anyway since we don't have real BPM data
+    if (spotifySongs.length > 0 && filtered.length === 0) {
+      console.warn('All Spotify tracks filtered out by intensity. Returning all tracks since BPM data is unavailable.')
+      return availableSongs
+    }
+    
+    return filtered
+  }, [availableSongs, distance, intensity, spotifySongs.length])
 
   const currentSong = songs[currentSongIndex] || songs[0]
 
