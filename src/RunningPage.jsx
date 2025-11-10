@@ -319,7 +319,10 @@ function RunningPage({ playlistTitle, currentSong, onStop, onPause, onSkip }) {
           </View>
           <View style={styles.songInfo}>
             <View style={styles.songTitleRow}>
-              <Text style={styles.songTitle}>{currentSong?.title || 'No song playing'}</Text>
+              <View style={styles.songTitleContainer}>
+                <Text style={styles.songTitle}>{currentSong?.title || 'No song playing'}</Text>
+                <Text style={styles.songArtist}>{currentSong?.artist || ''}</Text>
+              </View>
               <View style={styles.songControls}>
                 <Pressable style={styles.controlButton} onPress={handleSongPause}>
                   <MaterialIcons 
@@ -333,7 +336,6 @@ function RunningPage({ playlistTitle, currentSong, onStop, onPause, onSkip }) {
                 </Pressable>
               </View>
             </View>
-            <Text style={styles.songArtist}>{currentSong?.artist || ''}</Text>
             <Text style={styles.songBpm}>BPM: {currentSong?.bpm || 0}</Text>
           </View>
         </View>

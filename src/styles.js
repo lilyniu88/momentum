@@ -416,16 +416,25 @@ export const runningPageStyles = StyleSheet.create({
   },
   songTitleRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     gap: 12,
+  },
+  songTitleContainer: {
+    flex: 1,
+    gap: 2,
   },
   songTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: '#000000',
     fontFamily: Platform.OS === 'web' ? 'Oswald, sans-serif' : undefined,
-    flex: 1,
+  },
+  songArtist: {
+    fontSize: 15,
+    color: '#000000',
+    opacity: 0.7,
+    fontFamily: Platform.OS === 'web' ? 'Figtree, sans-serif' : undefined,
   },
   songControls: {
     flexDirection: 'row',
@@ -436,12 +445,7 @@ export const runningPageStyles = StyleSheet.create({
     fontSize: 15,
     color: '#000000',
     fontFamily: Platform.OS === 'web' ? 'Figtree, sans-serif' : undefined,
-  },
-  songArtist: {
-    fontSize: 15,
-    color: '#000000',
-    opacity: 0.7,
-    fontFamily: Platform.OS === 'web' ? 'Figtree, sans-serif' : undefined,
+    marginTop: 4,
   },
   metricsRow: {
     flexDirection: 'row',
