@@ -2,13 +2,12 @@ import React, { useState } from 'react'
 import {
   View,
   Text,
-  StyleSheet,
   Pressable,
   ScrollView,
   Modal,
-  Platform,
 } from 'react-native'
 import Playlist from './Playlist'
+import { quickRunStyles as styles } from './styles'
 
 function QuickRun() {
   const [distance, setDistance] = useState('')
@@ -146,116 +145,5 @@ function QuickRun() {
     </View>
   )
 }
-
-const styles = StyleSheet.create({
-  app: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  contentContainer: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  container: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 48,
-    maxWidth: 500,
-    width: '100%',
-    borderWidth: 1,
-    borderColor: '#EFEFEF',
-  },
-  title: {
-    fontSize: 42,
-    fontWeight: '700',
-    color: '#5809C0',
-    textAlign: 'center',
-    marginBottom: 40,
-  },
-  filters: {
-    marginBottom: 32,
-  },
-  filterGroup: {
-    marginBottom: 24,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#5809C0',
-    marginBottom: 8,
-  },
-  pickerButton: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#EFEFEF',
-    borderRadius: 20,
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    minHeight: 50,
-  },
-  pickerButtonText: {
-    fontSize: 16,
-    color: '#5809C0',
-    flex: 1,
-  },
-  pickerArrow: {
-    fontSize: 12,
-    color: '#5809C0',
-    marginLeft: 8,
-  },
-  startButton: {
-    width: '100%',
-    paddingVertical: 18,
-    paddingHorizontal: 32,
-    backgroundColor: '#5809C0',
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  startButtonText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#FFFFFF',
-    textAlign: 'center',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    width: '80%',
-    maxWidth: 400,
-    maxHeight: '60%',
-    padding: 20,
-  },
-  modalOption: {
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#EFEFEF',
-  },
-  modalOptionSelected: {
-    backgroundColor: '#D3C2F7',
-  },
-  modalOptionText: {
-    fontSize: 16,
-    color: '#5809C0',
-  },
-  modalOptionTextSelected: {
-    fontWeight: '600',
-  },
-})
 
 export default QuickRun

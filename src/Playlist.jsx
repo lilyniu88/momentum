@@ -1,17 +1,19 @@
-import React from 'react'
+import React, { useMemo, useState } from 'react'
 import {
   View,
   Text,
-  StyleSheet,
   ScrollView,
   Pressable,
   FlatList,
   Platform,
 } from 'react-native'
 import { MaterialIcons } from '@expo/vector-icons'
+import { playlistStyles as styles } from './styles'
+import { generatePlaylist } from './services/playlistService'
+import RunningPage from './RunningPage'
 
-function Playlist({ distance, intensity }) {
-  const songs = [
+// All available songs (in a real app, this would come from Spotify API)
+const allSongs = [
     {
       id: 1,
       title: "360",
@@ -65,44 +67,98 @@ function Playlist({ distance, intensity }) {
       time: "2:18",
       expectedPace: "6:12",
       albumArt: "brat"
-    },
-    {
-      id: 7,
-      title: "Party in the U.S.A.",
-      artist: "Miley Cyrus",
-      bpm: 100,
-      time: "3:22",
-      expectedPace: "10:00",
-      albumArt: "miley"
-    },
-    {
-      id: 8,
-      title: "Fireball",
-      artist: "Pitbull",
-      bpm: 128,
-      time: "3:24",
-      expectedPace: "8:00",
-      albumArt: "pitbull"
-    },
-    {
-      id: 9,
-      title: "Good as Hell",
-      artist: "Lizzo",
-      bpm: 120,
-      time: "2:39",
-      expectedPace: "8:30",
-      albumArt: "lizzo"
-    },
-    {
-      id: 10,
-      title: "Levitating",
-      artist: "Dua Lipa",
-      bpm: 103,
-      time: "3:23",
-      expectedPace: "9:45",
-      albumArt: "dua"
+  },
+  {
+    id: 7,
+    title: "Party in the U.S.A.",
+    artist: "Miley Cyrus",
+    bpm: 100,
+    time: "3:22",
+    expectedPace: "10:00",
+    albumArt: "miley"
+  },
+  {
+    id: 8,
+    title: "Fireball",
+    artist: "Pitbull",
+    bpm: 128,
+    time: "3:24",
+    expectedPace: "8:00",
+    albumArt: "pitbull"
+  },
+  {
+    id: 9,
+    title: "Good as Hell",
+    artist: "Lizzo",
+    bpm: 120,
+    time: "2:39",
+    expectedPace: "8:30",
+    albumArt: "lizzo"
+  },
+  {
+    id: 10,
+    title: "Levitating",
+    artist: "Dua Lipa",
+    bpm: 103,
+    time: "3:23",
+    expectedPace: "9:45",
+    albumArt: "dua"
+  }
+]
+
+function Playlist({ distance, intensity }) {
+  const [showRunningPage, setShowRunningPage] = useState(false)
+  const [currentSongIndex, setCurrentSongIndex] = useState(0)
+
+  // Generate filtered playlist based on distance and intensity preferences
+  const songs = useMemo(() => {
+    return generatePlaylist(allSongs, distance, intensity)
+  }, [distance, intensity])
+
+  const currentSong = songs[currentSongIndex] || songs[0]
+
+  // Generate playlist title based on filters
+  const getPlaylistTitle = () => {
+    const intensityLabels = {
+      low: 'EASY',
+      medium: 'MODERATE',
+      high: 'INTENSE'
     }
-  ]
+    const distanceLabels = {
+      short: 'SHORT',
+      medium: 'MEDIUM',
+      long: 'LONG'
+    }
+    const intensityLabel = intensityLabels[intensity] || 'RUN'
+    const distanceLabel = distanceLabels[distance] || 'RUN'
+    return `${intensityLabel} ${distanceLabel} MIX`
+  }
+
+  const handlePlay = () => {
+    setShowRunningPage(true)
+  }
+
+  const handleStop = () => {
+    setShowRunningPage(false)
+    setCurrentSongIndex(0)
+  }
+
+  const handleSkip = () => {
+    setCurrentSongIndex((prev) => (prev + 1) % songs.length)
+  }
+
+  // Show running page if play button was clicked
+  if (showRunningPage) {
+    return (
+      <RunningPage
+        playlistTitle={getPlaylistTitle()}
+        currentSong={currentSong}
+        onStop={handleStop}
+        onPause={() => {}}
+        onSkip={handleSkip}
+      />
+    )
+  }
 
   const getAlbumArtText = (albumArt) => {
     const map = {
@@ -155,7 +211,7 @@ function Playlist({ distance, intensity }) {
           </View>
         </View>
         <Text style={styles.trackBpmCol}>{song.bpm}</Text>
-        <Text style={styles.trackTimeCol}>{song.time} min</Text>
+        <Text style={styles.trackTimeCol}>{song.time}</Text>
         <Text style={styles.trackPaceCol}>{song.expectedPace} min/mi</Text>
       </View>
     )
@@ -167,363 +223,87 @@ function Playlist({ distance, intensity }) {
   }, 0)
   const totalMinutes = Math.floor(totalTime / 60)
 
+  // Get unique artists from filtered songs
+  const uniqueArtists = [...new Set(songs.map(song => song.artist))]
+  const artistList = uniqueArtists.length > 0 
+    ? uniqueArtists.slice(0, 4).join(', ') + (uniqueArtists.length > 4 ? ', and more' : '')
+    : 'No songs available'
+
   return (
     <View style={styles.playlistPage}>
       <ScrollView style={styles.scrollView}>
-        {/* Status Bar */}
-        <View style={styles.statusBar}>
-          <Text style={styles.time}>9:41</Text>
-          <View style={styles.statusIcons}>
-            <MaterialIcons name="signal-cellular-4-bar" size={16} color="#5809C0" />
-            <MaterialIcons name="wifi" size={16} color="#5809C0" />
-            <MaterialIcons name="battery-full" size={16} color="#5809C0" />
-          </View>
-        </View>
-
         {/* Playlist Header */}
-        <View style={styles.playlistHeader}>
-          <View style={styles.playlistInfoSection}>
-            <View style={styles.albumArtGrid}>
+      <View style={styles.playlistHeader}>
+        <View style={styles.playlistInfoSection}>
+          <View style={styles.albumArtGrid}>
               <View style={[styles.albumArt, { backgroundColor: '#22c55e' }]}>
-                <Text style={styles.albumArtText}>brat</Text>
-              </View>
-              <View style={[styles.albumArt, { backgroundColor: '#e5e7eb' }]}>
-                <Text style={[styles.albumArtText, styles.albumArtTextDark]}>DAMN.</Text>
-              </View>
-              <View style={[styles.albumArt, { backgroundColor: '#1f2937' }]}>
-                <Text style={styles.albumArtText}>F</Text>
-              </View>
-              <View style={[styles.albumArt, { backgroundColor: '#fef3c7' }]}>
-                <Text style={[styles.albumArtText, styles.albumArtTextDark]}>L</Text>
-              </View>
+              <Text style={styles.albumArtText}>brat</Text>
             </View>
+              <View style={[styles.albumArt, { backgroundColor: '#e5e7eb' }]}>
+              <Text style={[styles.albumArtText, styles.albumArtTextDark]}>DAMN.</Text>
+            </View>
+              <View style={[styles.albumArt, { backgroundColor: '#1f2937' }]}>
+              <Text style={styles.albumArtText}>F</Text>
+            </View>
+              <View style={[styles.albumArt, { backgroundColor: '#fef3c7' }]}>
+              <Text style={[styles.albumArtText, styles.albumArtTextDark]}>L</Text>
+            </View>
+          </View>
 
             <View style={styles.playlistDetails}>
-              <Text style={styles.playlistTitle}>INTERVAL SPRINT MIX</Text>
+              <Text style={styles.playlistTitle}>
+                {getPlaylistTitle()}
+              </Text>
               <Text style={styles.playlistArtists}>
-                Charli XCX, Pitbull, Kendrick Lamar, Beyoncé, and more
+                {artistList}
               </Text>
               <Text style={styles.playlistSummary}>
                 {songs.length} songs, {totalMinutes} min
               </Text>
 
-              <View style={styles.actionButtonsRow}>
-                <Pressable style={styles.actionIconBtn}>
+            <View style={styles.actionButtonsRow}>
+              <Pressable style={styles.actionIconBtn}>
                   <MaterialIcons name="favorite-border" size={20} color="#5809C0" />
-                </Pressable>
-                <Pressable style={styles.actionIconBtn}>
+              </Pressable>
+              <Pressable style={styles.actionIconBtn}>
                   <MaterialIcons name="download" size={20} color="#5809C0" />
-                </Pressable>
-                <Pressable style={styles.actionIconBtn}>
+              </Pressable>
+              <Pressable style={styles.actionIconBtn}>
                   <MaterialIcons name="more-vert" size={20} color="#5809C0" />
-                </Pressable>
-              </View>
+              </Pressable>
+            </View>
 
-              <View style={styles.quickStartSection}>
-                <Text style={styles.quickStartText}>Quick start</Text>
-                <View style={styles.playControls}>
-                  <Pressable style={styles.playButton}>
+            <View style={styles.quickStartSection}>
+              <View style={styles.playControls}>
+                <Pressable style={styles.playButton} onPress={handlePlay}>
                     <MaterialIcons name="play-arrow" size={24} color="#FFFFFF" />
-                  </Pressable>
-                  <Pressable style={styles.chooseRouteButton}>
-                    <Text style={styles.chooseRouteText}>Choose Route</Text>
-                  </Pressable>
-                </View>
+                </Pressable>
               </View>
             </View>
           </View>
         </View>
+      </View>
 
         {/* Song List */}
-        <View style={styles.playlistTracks}>
-          <View style={styles.trackTableHeader}>
-            <Text style={[styles.headerCol, styles.titleCol]}>Title</Text>
-            <Text style={[styles.headerCol, styles.bpmCol]}>BPM</Text>
-            <Text style={[styles.headerCol, styles.timeCol]}>Time</Text>
-            <Text style={[styles.headerCol, styles.paceCol]}>Expected Pace</Text>
-          </View>
-
-          <FlatList
-            data={songs}
-            renderItem={renderTrack}
-            keyExtractor={(item) => item.id.toString()}
-            scrollEnabled={false}
-          />
+      <View style={styles.playlistTracks}>
+        <View style={styles.trackTableHeader}>
+          <Text style={[styles.headerCol, styles.titleCol]}>Title</Text>
+          <Text style={[styles.headerCol, styles.bpmCol]}>BPM</Text>
+          <Text style={[styles.headerCol, styles.timeCol]}>Time</Text>
+          <Text style={[styles.headerCol, styles.paceCol]}>Expected Pace</Text>
         </View>
-      </ScrollView>
 
-      {/* Navigation Bar */}
-      <View style={styles.navBar}>
-        <Pressable style={styles.navItem}>
-          <MaterialIcons name="home" size={24} color="#EFEFEF" />
-          <Text style={styles.navLabel}>Home</Text>
-        </Pressable>
-        <Pressable style={styles.navItem}>
-          <MaterialIcons name="people" size={24} color="#EFEFEF" />
-          <Text style={styles.navLabel}>Friends</Text>
-        </Pressable>
-        <Pressable style={styles.navItem}>
-          <MaterialIcons name="directions-run" size={24} color="#5809C0" />
-          <Text style={[styles.navLabel, styles.navLabelActive]}>Run!</Text>
-        </Pressable>
-        <Pressable style={styles.navItem}>
-          <MaterialIcons name="bar-chart" size={24} color="#EFEFEF" />
-          <Text style={styles.navLabel}>Activity</Text>
-        </Pressable>
-        <Pressable style={styles.navItem}>
-          <MaterialIcons name="settings" size={24} color="#EFEFEF" />
-          <Text style={styles.navLabel}>Settings</Text>
-        </Pressable>
+        <FlatList
+          data={songs}
+          renderItem={renderTrack}
+          keyExtractor={(item) => item.id.toString()}
+          scrollEnabled={false}
+        />
       </View>
+    </ScrollView>
     </View>
   )
 }
-
-const styles = StyleSheet.create({
-  playlistPage: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    ...(Platform.OS === 'web' && { minHeight: '100vh' }),
-  },
-  scrollView: {
-    flex: 1,
-  },
-  statusBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    backgroundColor: '#FFFFFF',
-  },
-  time: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#5809C0',
-    fontFamily: Platform.OS === 'web' ? 'Figtree, sans-serif' : undefined,
-  },
-  statusIcons: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  playlistHeader: {
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#EFEFEF',
-  },
-  playlistInfoSection: {
-    flexDirection: 'row',
-    gap: 20,
-    marginTop: 20,
-  },
-  albumArtGrid: {
-    width: 120,
-    height: 120,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 4,
-  },
-  albumArt: {
-    width: '48%',
-    height: '48%',
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  albumArtText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#FFFFFF',
-    fontFamily: Platform.OS === 'web' ? 'Oswald, sans-serif' : undefined,
-  },
-  albumArtTextDark: {
-    color: '#000000',
-  },
-  playlistDetails: {
-    flex: 1,
-    gap: 8,
-  },
-  playlistTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#000000',
-    lineHeight: 28.8,
-    fontFamily: Platform.OS === 'web' ? 'Figtree, sans-serif' : undefined,
-  },
-  playlistArtists: {
-    fontSize: 14,
-    color: '#000000',
-    fontFamily: Platform.OS === 'web' ? 'Figtree, sans-serif' : undefined,
-  },
-  playlistSummary: {
-    fontSize: 14,
-    color: '#000000',
-    marginBottom: 8,
-    fontFamily: Platform.OS === 'web' ? 'Figtree, sans-serif' : undefined,
-  },
-  actionButtonsRow: {
-    flexDirection: 'row',
-    gap: 16,
-    marginTop: 8,
-  },
-  actionIconBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#EFEFEF',
-    backgroundColor: '#FFFFFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  quickStartSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginTop: 16,
-  },
-  quickStartText: {
-    fontSize: 14,
-    color: '#000000',
-    fontWeight: '500',
-    fontFamily: Platform.OS === 'web' ? 'Figtree, sans-serif' : undefined,
-  },
-  playControls: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  playButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#5809C0',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  chooseRouteButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    backgroundColor: '#5809C0',
-    borderRadius: 20,
-  },
-  chooseRouteText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#FFFFFF',
-    fontFamily: Platform.OS === 'web' ? 'Figtree, sans-serif' : undefined,
-  },
-  playlistTracks: {
-    padding: 20,
-  },
-  trackTableHeader: {
-    flexDirection: 'row',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#EFEFEF',
-  },
-  headerCol: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#5809C0',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    fontFamily: Platform.OS === 'web' ? 'Figtree, sans-serif' : undefined,
-  },
-  titleCol: {
-    flex: 2,
-  },
-  bpmCol: {
-    flex: 0.8,
-  },
-  timeCol: {
-    flex: 0.8,
-  },
-  paceCol: {
-    flex: 1,
-  },
-  trackRow: {
-    flexDirection: 'row',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#EFEFEF',
-    alignItems: 'center',
-  },
-  trackTitleCol: {
-    flex: 2,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  trackThumbnail: {
-    width: 48,
-    height: 48,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  thumbnailText: {
-    fontSize: 10,
-    fontWeight: '600',
-    fontFamily: Platform.OS === 'web' ? 'Oswald, sans-serif' : undefined,
-  },
-  trackInfo: {
-    flex: 1,
-    gap: 4,
-  },
-  trackName: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: '#000000',
-    fontFamily: Platform.OS === 'web' ? 'Oswald, sans-serif' : undefined,
-  },
-  trackArtist: {
-    fontSize: 14,
-    color: '#000000',
-    opacity: 0.7,
-    fontFamily: Platform.OS === 'web' ? 'Figtree, sans-serif' : undefined,
-  },
-  trackBpmCol: {
-    flex: 0.8,
-    fontSize: 14,
-    color: '#000000',
-    fontFamily: Platform.OS === 'web' ? 'Figtree, sans-serif' : undefined,
-  },
-  trackTimeCol: {
-    flex: 0.8,
-    fontSize: 14,
-    color: '#000000',
-    fontFamily: Platform.OS === 'web' ? 'Figtree, sans-serif' : undefined,
-  },
-  trackPaceCol: {
-    flex: 1,
-    fontSize: 14,
-    color: '#000000',
-    fontFamily: Platform.OS === 'web' ? 'Figtree, sans-serif' : undefined,
-  },
-  navBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#EFEFEF',
-    backgroundColor: '#FFFFFF',
-  },
-  navItem: {
-    alignItems: 'center',
-    gap: 4,
-  },
-  navLabel: {
-    fontSize: 14,
-    color: '#EFEFEF',
-    fontFamily: Platform.OS === 'web' ? 'Figtree, sans-serif' : undefined,
-  },
-  navLabelActive: {
-    color: '#5809C0',
-  },
-})
 
 export default Playlist
 

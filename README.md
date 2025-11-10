@@ -1,13 +1,15 @@
 # Momentum - Quick Run App
 
-A modern React Native running app that generates personalized playlists based on distance and intensity preferences.
+A modern React Native running app that generates personalized playlists based on distance and intensity preferences, with real-time GPS tracking.
 
 ## Features
 
 - **Quick Run** home page with distance and intensity filters
 - **Playlist Generation** - Automatically generates a curated playlist based on your preferences
+- **Real-time Running Tracking** - GPS-based distance and pace calculation
+- **Live Map View** - See your location and route in real-time
 - **Material UI Icons** - Beautiful, consistent iconography throughout
-- **Responsive Design** - Works on iOS, Android, and Web
+- **Mobile-First Design** - Optimized for iOS and Android (Expo Go compatible)
 
 ## Design System
 
@@ -45,26 +47,18 @@ npm install
 
 ### Running the App
 
-#### Option 1: Web Development (Recommended for Development)
+#### Option 1: Expo Go (Recommended - Mobile Device)
 
-The easiest way to develop and test the app is on the web:
-
+1. Start Expo:
 ```bash
-npm run web
+npx expo start
 ```
 
-Or:
+2. Scan the QR code with:
+   - **iOS:** Camera app or Expo Go app
+   - **Android:** Expo Go app
 
-```bash
-npx expo start --web
-```
-
-This will:
-1. Start the Metro bundler
-2. Open the app in your default browser at `http://localhost:8081`
-3. Enable hot reloading for fast development
-
-**Note:** The app uses web-compatible dropdowns when running on web, so you can develop and test the UI without needing a mobile device or simulator.
+**Note:** The app uses GPS for location tracking, so you'll need to grant location permissions when prompted.
 
 #### Option 2: iOS Simulator (macOS only)
 
@@ -95,47 +89,36 @@ npm start
 npm run android
 ```
 
-#### Option 4: Expo Go (Mobile Device)
-
-1. Start Expo:
-```bash
-npx expo start
-```
-
-2. Scan the QR code with:
-   - **iOS:** Camera app or Expo Go app
-   - **Android:** Expo Go app
-
 ## Project Structure
 
 ```
 momentum/
 ├── src/
-│   ├── QuickRun.jsx    # Main Quick Run component with filters
-│   └── Playlist.jsx   # Playlist display component
-├── index.js           # React Native entry point
-├── app.json           # App configuration
-├── package.json       # Dependencies and scripts
-└── README.md          # This file
+│   ├── QuickRun.jsx       # Main Quick Run component with filters
+│   ├── Playlist.jsx      # Playlist display component
+│   ├── RunningPage.jsx   # Real-time running tracking with GPS
+│   ├── services/
+│   │   ├── playlistService.js  # Playlist filtering logic
+│   │   └── healthService.js    # Pace and distance calculations
+│   └── styles.js         # Universal styles
+├── index.js                # React Native entry point
+├── app.json               # App configuration
+├── package.json           # Dependencies and scripts
+└── README.md              # This file
 ```
 
 ## Development Tips
 
-### Web Development
+### Location Tracking
 
-- The app automatically detects the platform and uses web-compatible components
-- Material UI icons work seamlessly on web
-- Hot reloading is enabled by default
-- Open browser DevTools (F12) to see console logs and debug
-
-### Fonts on Web
-
-The app uses web fonts (Oswald and Figtree) when running on web. Make sure you have internet connection or the fonts are loaded in your HTML. The fonts will fall back to system fonts if not available.
+- The app uses GPS for real-time distance and pace calculation
+- Location permissions are required for the running features
+- Distance is calculated using the Haversine formula between GPS coordinates
+- GPS noise is filtered out (movements < 3 meters are ignored)
 
 ## Scripts
 
 - `npm start` - Start Metro bundler
-- `npm run web` - Start Expo with web support
 - `npm run ios` - Run on iOS simulator
 - `npm run android` - Run on Android emulator
 - `npm test` - Run tests
@@ -143,26 +126,17 @@ The app uses web fonts (Oswald and Figtree) when running on web. Make sure you h
 
 ## Troubleshooting
 
-### Web page is blank
+### Location not working
 
-1. Check the browser console (F12) for errors
-2. Make sure Metro bundler is running
-3. Try clearing cache: `npx expo start --web --clear`
-4. Refresh the browser page
+1. Make sure you've granted location permissions when prompted
+2. Check that location services are enabled on your device
+3. For best results, use the app outdoors with clear sky view
 
-### Fonts not loading on web
+### Pace showing incorrect values
 
-The app uses web fonts. If fonts don't load:
-1. Check your internet connection
-2. Fonts will fall back to system fonts automatically
-3. The app will still function correctly
-
-### Picker not working on web
-
-The app uses custom web-compatible dropdowns when running on web. If you see issues:
-1. Make sure you're using the latest version
-2. Check browser console for errors
-3. Try a different browser
+- Pace is calculated from GPS distance and elapsed time
+- Make sure you're moving (GPS noise when stationary is filtered out)
+- The app requires actual movement to calculate accurate pace
 
 ## License
 
