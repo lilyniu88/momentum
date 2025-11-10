@@ -213,189 +213,17 @@ const getAlbumCoverArt = async (albumId) => {
 };
 
 /**
- * Search for artist in ReccoBeats API
- * Reference: https://reccobeats.com/docs/apis/get-artist-track
- */
-const searchArtist = async (artistName) => {
-  try {
-    const apiUrl = `https://api.reccobeats.com/v1/artist/search?name=${encodeURIComponent(artistName)}`;
-    const response = await fetch(apiUrl, {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-      },
-    });
-    
-    if (!response.ok) {
-      return null;
-    }
-    
-    const data = await response.json();
-    // If it's an array, return the first result; if it's an object, return it
-    if (Array.isArray(data) && data.length > 0) {
-      return data[0];
-    } else if (data && data.id) {
-      return data;
-    }
-    return null;
-  } catch (error) {
-    return null;
-  }
-};
-
-/**
- * Get tracks for an artist from ReccoBeats API
- */
-const getArtistTracks = async (artistId) => {
-  try {
-    const apiUrl = `https://api.reccobeats.com/v1/artist/${artistId}/track`;
-    const response = await fetch(apiUrl, {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-      },
-    });
-    
-    if (!response.ok) {
-      return [];
-    }
-    
-    const data = await response.json();
-    return Array.isArray(data) ? data : [];
-  } catch (error) {
-    return [];
-  }
-};
-
-/**
- * Find track in ReccoBeats by title and artist name
- * Returns the ReccoBeats track ID if found
- */
-const findTrackInReccoBeats = async (title, artistName) => {
-  try {
-    // Step 1: Search for the artist
-    const artist = await searchArtist(artistName);
-    if (!artist || !artist.id) {
-      return null;
-    }
-    
-    // Step 2: Get artist's tracks
-    const tracks = await getArtistTracks(artist.id);
-    if (!tracks || tracks.length === 0) {
-      return null;
-    }
-    
-    // Step 3: Find matching track by title (case-insensitive, partial match)
-    const normalizedTitle = title.toLowerCase().trim();
-    const matchingTrack = tracks.find(track => {
-      const trackTitle = (track.trackTitle || track.title || '').toLowerCase().trim();
-      return trackTitle === normalizedTitle || trackTitle.includes(normalizedTitle) || normalizedTitle.includes(trackTitle);
-    });
-    
-    return matchingTrack ? matchingTrack.id : null;
-  } catch (error) {
-    return null;
-  }
-};
-
-/**
- * Get audio features for a single track using ReccoBeats API
- * Searches by title and artist, then fetches audio features
- * Reference: https://reccobeats.com/docs/apis/get-track-audio-features
- */
-const getSingleTrackAudioAnalysis = async (title, artistName, spotifyTrackId) => {
-  try {
-    // Step 1: Find the track in ReccoBeats by searching for artist and matching title
-    const reccoBeatsTrackId = await findTrackInReccoBeats(title, artistName);
-    if (!reccoBeatsTrackId) {
-      return null; // Track not found in ReccoBeats
-    }
-    
-    // Step 2: Get audio features using ReccoBeats track ID
-    const apiUrl = `https://api.reccobeats.com/v1/track/${reccoBeatsTrackId}/audio-features`;
-    const response = await fetch(apiUrl, {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-      },
-    });
-    
-    if (!response.ok) {
-      return null;
-    }
-    
-    const data = await response.json();
-    
-    // Extract tempo from the response
-    if (data && data.tempo !== undefined && data.tempo !== null) {
-      return {
-        id: spotifyTrackId, // Keep Spotify ID for mapping
-        tempo: data.tempo,
-        // Include other audio features if needed
-        acousticness: data.acousticness,
-        danceability: data.danceability,
-        energy: data.energy,
-        instrumentalness: data.instrumentalness,
-        liveness: data.liveness,
-        loudness: data.loudness,
-        speechiness: data.speechiness,
-        valence: data.valence,
-      };
-    }
-    return null;
-  } catch (error) {
-    return null;
-  }
-};
-
-/**
- * Get audio features (BPM/tempo) for tracks using ReccoBeats API
- * Searches by title and artist, then fetches audio features
- * Reference: https://reccobeats.com/docs/apis/get-track-audio-features
+ * Get audio features for tracks
+ * Note: Spotify's audio-features and audio-analysis endpoints are deprecated for new apps
+ * This function returns an empty array - tracks will use default BPM of 120
  * 
- * @param {Array<Object>} tracks - Array of track objects with { id, name, artists }
+ * @param {Array<string>} trackIds - Array of Spotify track IDs
  * @returns {Promise<Array>} - Array of objects with { id, tempo, ... }
  */
-const getAudioFeatures = async (tracks) => {
-  if (!tracks || tracks.length === 0) {
+const getAudioFeatures = async (trackIds) => {
+  // Audio features endpoints are deprecated for new Spotify apps
+  // Return empty array - tracks will use default BPM
     return [];
-  }
-  
-  const allFeatures = [];
-  const maxRequests = 50; // Limit to avoid rate limiting
-  
-  // Process tracks with delays to respect rate limits
-  for (let i = 0; i < Math.min(tracks.length, maxRequests); i++) {
-    const track = tracks[i];
-    if (!track || !track.id || !track.name) {
-      continue;
-    }
-    
-    // Get artist name (first artist)
-    const artistName = track.artists && track.artists.length > 0
-      ? track.artists[0].name
-      : null;
-    
-    if (!artistName) {
-      continue;
-    }
-    
-    try {
-      const analysis = await getSingleTrackAudioAnalysis(track.name, artistName, track.id);
-      if (analysis && analysis.tempo) {
-        allFeatures.push(analysis);
-      }
-      
-      // Add delay between requests to avoid rate limiting
-      if (i < Math.min(tracks.length, maxRequests) - 1) {
-        await new Promise(resolve => setTimeout(resolve, 200)); // Increased delay for search operations
-      }
-    } catch (error) {
-      // Skip this track and continue
-    }
-  }
-  
-  return allFeatures;
 };
 
 /**
@@ -456,15 +284,16 @@ const fetchTopTracksWithFeatures = async (options = {}) => {
       return [];
     }
     
+    const trackIds = tracks.map(track => track.id).filter(Boolean);
+    
     let audioFeatures = [];
     try {
-      // Pass full track objects instead of just IDs so we can search by title and artist
-      audioFeatures = await getAudioFeatures(tracks);
+      audioFeatures = await getAudioFeatures(trackIds);
     } catch (error) {
       // Continue without BPM data - tracks will have default BPM
     }
     
-    // Create a map of track ID to audio features data (contains tempo/BPM from ReccoBeats)
+    // Create a map of track ID to audio features data
     const featuresMap = {};
     if (audioFeatures && Array.isArray(audioFeatures)) {
       audioFeatures.forEach((features) => {
@@ -479,7 +308,6 @@ const fetchTopTracksWithFeatures = async (options = {}) => {
       .filter(track => track && track.id) // Filter out invalid tracks
       .map((track) => {
       const features = featuresMap[track.id];
-        // ReccoBeats API returns tempo directly in the response
       const bpm = features?.tempo ? Math.round(features.tempo) : null;
       
       // Get artist name (first artist)
