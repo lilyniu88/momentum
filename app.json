@@ -2,6 +2,8 @@
   "expo": {
     "name": "momentum",
     "slug": "momentum",
+    "scheme": "momentum",
+    "assetBundlePatterns": ["**/*"],
     "plugins": [
       [
         "expo-location",
@@ -15,7 +17,8 @@
           "healthSharePermission": "Allow Momentum to read your health data to track distance, steps, and heart rate during your runs.",
           "healthUpdatePermission": "Allow Momentum to save workout data to HealthKit."
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "ios": {
       "infoPlist": {
