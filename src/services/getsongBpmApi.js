@@ -1,11 +1,5 @@
 /**
- * GetSong BPM API Service
  * Fetches BPM data from https://api.getsong.co/
- * 
- * API Documentation: https://getsongbpm.com/api
- * 
- * Note: Requires API key registration at https://getsongbpm.com/api
- * API key should be stored in environment variable GETSONG_API_KEY
  */
 
 const GETSONG_API_BASE = 'https://api.getsong.co';
@@ -20,9 +14,7 @@ const getApiKey = () => {
   const apiKey = process.env.GETSONG_API_KEY || process.env.EXPO_PUBLIC_GETSONG_API_KEY;
   
   if (!apiKey) {
-    console.warn('⚠️  GETSONG_API_KEY not found in environment variables.');
-    console.warn('Please add GETSONG_API_KEY to your .env file.');
-    console.warn('Register at https://getsongbpm.com/api to get an API key.');
+    console.warn('GETSONG_API_KEY not found in environment variables.');
     return null;
   }
   
@@ -36,7 +28,7 @@ const makeRequest = async (endpoint, params = {}) => {
   const apiKey = getApiKey();
   
   if (!apiKey) {
-    throw new Error('GetSong API key not configured. Please add GETSONG_API_KEY to your .env file.');
+    throw new Error('GetSong API key not configured.');
   }
   
   // Build URL with API key
@@ -53,7 +45,7 @@ const makeRequest = async (endpoint, params = {}) => {
     const response = await fetch(url, {
       method: 'GET',
       headers: {
-        'X-API-KEY': apiKey, // Alternative: use header instead of query param
+        'X-API-KEY': apiKey, 
       },
     });
     
@@ -62,7 +54,7 @@ const makeRequest = async (endpoint, params = {}) => {
       console.error('GetSong API request failed:', response.status, response.statusText, errorText);
       
       if (response.status === 401) {
-        throw new Error('Invalid API key. Please check your GETSONG_API_KEY.');
+        throw new Error('Invalid API key.');
       } else if (response.status === 429) {
         throw new Error('Rate limit exceeded. Please wait before making more requests.');
       }
@@ -102,42 +94,45 @@ export const searchSong = async (songTitle, artistName) => {
       limit: '5', // Get top 5 results
     });
     
-    if (!data || !data.search || data.search.length === 0) {
+    let searchResults = null;
+    
+    // Check for error response first
+    if (data && data.search && data.search.error) {
       return null;
     }
     
-    // Find the best match (exact or close match)
-    // The API returns songs, so we look for the one that matches our search
-    const songs = data.search.filter(item => item.title && item.artist);
+    if (Array.isArray(data)) {
+      // Direct array response
+      searchResults = data;
+    } else if (data && data.search && Array.isArray(data.search)) {
+      searchResults = data.search;
+    } else if (data && typeof data === 'object') {
+      // Try to find any array property in the response
+      for (const key in data) {
+        if (Array.isArray(data[key])) {
+          searchResults = data[key];
+          break;
+        }
+      }
+    }
     
-    if (songs.length === 0) {
+    if (!searchResults || searchResults.length === 0) {
       return null;
     }
     
-    // Try to find exact match first
-    const exactMatch = songs.find(song => 
-      song.title.toLowerCase() === songTitle.toLowerCase() &&
-      song.artist.some(artist => artist.name.toLowerCase() === artistName.toLowerCase())
-    );
+    // Use the first song returned from the API
+    const firstSong = searchResults[0];
     
-    if (exactMatch) {
-      return {
-        id: exactMatch.id,
-        title: exactMatch.title,
-        tempo: exactMatch.tempo ? parseInt(exactMatch.tempo) : null,
-        artist: exactMatch.artist,
-        uri: exactMatch.uri,
-      };
+    if (!firstSong || !firstSong.title || !firstSong.tempo) {
+      return null;
     }
     
-    // Return first result if no exact match
-    const firstResult = songs[0];
     return {
-      id: firstResult.id,
-      title: firstResult.title,
-      tempo: firstResult.tempo ? parseInt(firstResult.tempo) : null,
-      artist: firstResult.artist,
-      uri: firstResult.uri,
+      id: firstSong.id,
+      title: firstSong.title,
+      tempo: firstSong.tempo ? parseInt(firstSong.tempo) : null,
+      artist: firstSong.artist, 
+      uri: firstSong.uri,
     };
   } catch (error) {
     console.warn(`Failed to search song "${songTitle}" by "${artistName}":`, error.message);
@@ -194,6 +189,7 @@ export const batchFetchBpms = async (songs) => {
       const songData = await searchSong(song.title, song.artist);
       
       if (songData && songData.tempo) {
+        // Keep the original artist string (not the array from GetSong API)
         results.push({
           ...song,
           bpm: songData.tempo,
@@ -208,8 +204,6 @@ export const batchFetchBpms = async (songs) => {
       }
       
       // Add delay between requests to avoid rate limiting
-      // 3000 requests/hour = ~50 requests/minute = ~1.2 seconds between requests
-      // We'll use 1 second delay to be safe
       if (i < Math.min(songs.length, maxRequests) - 1) {
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
@@ -229,10 +223,10 @@ export const batchFetchBpms = async (songs) => {
   }
   
   const foundBpms = results.filter(r => r.bpm !== null).length;
-  console.log(`✅ Retrieved BPM data for ${foundBpms}/${results.length} songs from GetSong API`);
+  console.log( `Retrieved BPM data for ${foundBpms}/${results.length} songs from GetSong API`);
   
   if (foundBpms === 0) {
-    console.warn('⚠️  No BPM data found. Make sure GETSONG_API_KEY is set correctly.');
+    console.warn('No BPM data found.');
   }
   
   return results;
