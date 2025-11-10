@@ -235,54 +235,54 @@ function Playlist({ distance, intensity }) {
         {/* Playlist Header */}
       <View style={styles.playlistHeader}>
         <View style={styles.playlistInfoSection}>
-          <View style={styles.albumArtGrid}>
+          <View>
+            <View style={styles.albumArtGrid}>
               <View style={[styles.albumArt, { backgroundColor: '#22c55e' }]}>
-              <Text style={styles.albumArtText}>brat</Text>
-            </View>
+                <Text style={styles.albumArtText}>brat</Text>
+              </View>
               <View style={[styles.albumArt, { backgroundColor: '#e5e7eb' }]}>
-              <Text style={[styles.albumArtText, styles.albumArtTextDark]}>DAMN.</Text>
-            </View>
+                <Text style={[styles.albumArtText, styles.albumArtTextDark]}>DAMN.</Text>
+              </View>
               <View style={[styles.albumArt, { backgroundColor: '#1f2937' }]}>
-              <Text style={styles.albumArtText}>F</Text>
-            </View>
+                <Text style={styles.albumArtText}>F</Text>
+              </View>
               <View style={[styles.albumArt, { backgroundColor: '#fef3c7' }]}>
-              <Text style={[styles.albumArtText, styles.albumArtTextDark]}>L</Text>
-            </View>
-          </View>
-
-            <View style={styles.playlistDetails}>
-              <Text style={styles.playlistTitle}>
-                {getPlaylistTitle()}
-              </Text>
-              <Text style={styles.playlistArtists}>
-                {artistList}
-              </Text>
-              <Text style={styles.playlistSummary}>
-                {songs.length} songs, {totalMinutes} min
-              </Text>
-
-            <View style={styles.actionButtonsRow}>
-              <Pressable style={styles.actionIconBtn}>
-                  <MaterialIcons name="favorite-border" size={20} color="#5809C0" />
-              </Pressable>
-              <Pressable style={styles.actionIconBtn}>
-                  <MaterialIcons name="download" size={20} color="#5809C0" />
-              </Pressable>
-              <Pressable style={styles.actionIconBtn}>
-                  <MaterialIcons name="more-vert" size={20} color="#5809C0" />
-              </Pressable>
-            </View>
-
-            <View style={styles.quickStartSection}>
-              <View style={styles.playControls}>
-                <Pressable style={styles.playButton} onPress={handlePlay}>
-                    <MaterialIcons name="play-arrow" size={24} color="#FFFFFF" />
-                </Pressable>
+                <Text style={[styles.albumArtText, styles.albumArtTextDark]}>L</Text>
               </View>
             </View>
+            <Text style={styles.playlistSummary}>
+              {songs.length} songs, {totalMinutes} min
+            </Text>
+          </View>
+
+          <View style={styles.playlistDetails}>
+            <Text style={styles.playlistTitle}>
+              {getPlaylistTitle()}
+            </Text>
+            <Text style={styles.playlistArtists}>
+              {artistList}
+            </Text>
           </View>
         </View>
       </View>
+
+        {/* Action Buttons */}
+        <View style={styles.playlistActionsRow}>
+          <View style={styles.actionButtonsRow}>
+            <Pressable style={styles.actionIconBtn}>
+              <MaterialIcons name="favorite-border" size={20} color="#5809C0" />
+            </Pressable>
+            <Pressable style={styles.actionIconBtn}>
+              <MaterialIcons name="download" size={20} color="#5809C0" />
+            </Pressable>
+            <Pressable style={styles.actionIconBtn}>
+              <MaterialIcons name="more-vert" size={20} color="#5809C0" />
+            </Pressable>
+          </View>
+          <Pressable style={styles.playButton} onPress={handlePlay}>
+            <MaterialIcons name="play-arrow" size={24} color="#FFFFFF" />
+          </Pressable>
+        </View>
 
         {/* Song List */}
       <View style={styles.playlistTracks}>

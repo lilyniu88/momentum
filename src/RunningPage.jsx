@@ -318,26 +318,23 @@ function RunningPage({ playlistTitle, currentSong, onStop, onPause, onSkip }) {
             </Text>
           </View>
           <View style={styles.songInfo}>
-            <Text style={styles.songTitle}>{currentSong?.title || 'No song playing'}</Text>
+            <View style={styles.songTitleRow}>
+              <Text style={styles.songTitle}>{currentSong?.title || 'No song playing'}</Text>
+              <View style={styles.songControls}>
+                <Pressable style={styles.controlButton} onPress={handleSongPause}>
+                  <MaterialIcons 
+                    name={isSongPaused ? "play-arrow" : "pause"} 
+                    size={24} 
+                    color="#5809C0" 
+                  />
+                </Pressable>
+                <Pressable style={styles.controlButton} onPress={handleSkip}>
+                  <MaterialIcons name="skip-next" size={24} color="#5809C0" />
+                </Pressable>
+              </View>
+            </View>
             <Text style={styles.songArtist}>{currentSong?.artist || ''}</Text>
-          </View>
-        </View>
-
-        <View style={styles.metricsRow}>
-          <View style={styles.metricsColumn}>
-            <Text style={styles.metricLabel}>BPM: {currentSong?.bpm || 0}</Text>
-          </View>
-          <View style={styles.topControls}>
-            <Pressable style={styles.controlButton} onPress={handleSongPause}>
-              <MaterialIcons 
-                name={isSongPaused ? "play-arrow" : "pause"} 
-                size={24} 
-                color="#5809C0" 
-              />
-            </Pressable>
-            <Pressable style={styles.controlButton} onPress={handleSkip}>
-              <MaterialIcons name="skip-next" size={24} color="#5809C0" />
-            </Pressable>
+            <Text style={styles.songBpm}>BPM: {currentSong?.bpm || 0}</Text>
           </View>
         </View>
       </View>
