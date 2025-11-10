@@ -27,13 +27,10 @@ export default function SpotifyPage() {
 
         <View style={styles.redirectUriContainer}>
           <Text style={styles.redirectUriLabel}>
-            Redirect URI (add this EXACT URL to Spotify):
+            Redirect URI:
           </Text>
           <Text style={styles.redirectUriText} selectable>
             {redirectUri}
-          </Text>
-          <Text style={styles.redirectUriNote}>
-            ⚠️ Copy this URI and add it to Spotify Developer Dashboard → Your App → Edit Settings → Redirect URIs
           </Text>
         </View>
 

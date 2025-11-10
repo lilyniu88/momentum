@@ -6,9 +6,6 @@
     "scheme": "momentum",
     "ios": {
       "bundleIdentifier": "com.ziana.momentum"
-    },
-    "android": {
-      "package": "com.ziana.momentum"
     }
   }
 }
