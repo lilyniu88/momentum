@@ -71,21 +71,32 @@ In your Spotify app settings, ensure these scopes are enabled:
 - `user-top-read` (required - to fetch top tracks)
 - `user-read-private` (optional - for user profile info)
 
-## Step 5: Set Up Environment Variables
+## Step 5: Set Up GetSong BPM API
+
+The app uses GetSong BPM API to fetch accurate BPM data for songs. You need to register for a free API key.
+
+1. Go to [GetSong BPM API](https://getsongbpm.com/api)
+2. Fill in the registration form with a valid email address
+3. You'll receive an API key via email
+4. **Important**: You must add a backlink to getsongbpm.com in your app (as per their terms)
+
+## Step 6: Set Up Environment Variables
 
 1. Create a `.env` file in the root of your project (if it doesn't exist)
-2. Add your Spotify Client ID:
+2. Add your Spotify Client ID and GetSong API key:
 
 ```env
 EXPO_PUBLIC_SPOTIFY_CLIENT_ID=your_client_id_here
+GETSONG_API_KEY=your_getsong_api_key_here
 ```
 
 **Important:**
-- Use `EXPO_PUBLIC_` prefix so Expo exposes it to the client
-- Do NOT include `CLIENT_SECRET` - PKCE handles security without it
+- Use `EXPO_PUBLIC_` prefix for Spotify Client ID so Expo exposes it to the client
+- GetSong API key can be `GETSONG_API_KEY` or `EXPO_PUBLIC_GETSONG_API_KEY`
+- Do NOT include Spotify `CLIENT_SECRET` - PKCE handles security without it
 - Never commit `.env` to version control (it should be in `.gitignore`)
 
-## Step 6: Install Dependencies
+## Step 7: Install Dependencies
 
 Dependencies should already be installed, but if needed:
 
@@ -93,7 +104,7 @@ Dependencies should already be installed, but if needed:
 npx expo install expo-auth-session expo-linking expo-secure-store
 ```
 
-## Step 7: Test the Integration
+## Step 8: Test the Integration
 
 1. Start your Expo app:
    ```bash
@@ -111,6 +122,12 @@ npx expo install expo-auth-session expo-linking expo-secure-store
 - Make sure your `.env` file exists in the root directory
 - Make sure the variable is named `EXPO_PUBLIC_SPOTIFY_CLIENT_ID`
 - Restart your Expo server after creating/updating `.env`
+
+### "GetSong API key not configured" warning
+- Make sure `GETSONG_API_KEY` is set in your `.env` file
+- Register for a free API key at https://getsongbpm.com/api
+- Restart your Expo server after adding the API key
+- Note: The API has a rate limit of 3000 requests per hour
 
 ### "Invalid redirect URI" error
 - Check that your redirect URI in Spotify Dashboard matches exactly what's returned by `makeRedirectUri`
@@ -138,10 +155,15 @@ npx expo install expo-auth-session expo-linking expo-secure-store
 
 Once authenticated, the app will:
 1. Fetch your top 50 tracks from Spotify
-2. Get BPM (tempo) for each track using Audio Features API
+2. Get BPM (tempo) for each track using GetSong BPM API (searches by song title and artist)
 3. Sort tracks by BPM
-4. Filter by distance/intensity preferences
+4. Filter by distance/intensity preferences based on BPM ranges
 5. Allow you to open tracks in Spotify app
+
+**BPM Filtering:**
+- **Low intensity**: 120-140 BPM
+- **Medium intensity**: 140-160 BPM
+- **High intensity**: 160+ BPM
 
 Enjoy your personalized running playlists! 🎵🏃
 

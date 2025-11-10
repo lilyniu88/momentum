@@ -1,4 +1,5 @@
 import { getValidAccessToken } from './spotifyAuth';
+import { batchFetchBpms } from './getsongBpmApi';
 
 const SPOTIFY_API_BASE = 'https://api.spotify.com/v1';
 
@@ -244,75 +245,87 @@ const fetchTopTracksWithFeatures = async (options = {}) => {
       return [];
     }
     
-    // Extract track IDs
-    const trackIds = tracks.map(track => track.id).filter(Boolean);
-    console.log(`Fetching audio analysis (BPM) for ${trackIds.length} tracks`);
-    
-    if (trackIds.length === 0) {
-      console.warn('No valid track IDs found');
-      return [];
-    }
-    
-    // Get audio analysis (BPM/tempo) using /audio-analysis endpoint
-    // This endpoint is available for new Spotify apps
-    let audioFeatures = [];
-    try {
-      audioFeatures = await getAudioFeatures(trackIds);
-      console.log(`Retrieved BPM data from audio analysis for ${audioFeatures?.length || 0} tracks`);
-    } catch (error) {
-      console.warn('Failed to fetch audio analysis, continuing without BPM data:', error.message);
-      console.warn('Tracks will be displayed with default BPM of 120');
-      // Continue without BPM data - tracks will have default BPM
-    }
-    
-    // Create a map of track ID to audio analysis data (contains tempo/BPM)
-    const featuresMap = {};
-    if (audioFeatures && Array.isArray(audioFeatures)) {
-      audioFeatures.forEach((features) => {
-        if (features && features.id) {
-          featuresMap[features.id] = features;
-        }
-      });
-    }
-    
-    // Map tracks to app format
-    const mappedTracks = tracks
-      .filter(track => track && track.id) // Filter out invalid tracks
+    // First, map tracks to basic format with title and artist
+    const tracksWithInfo = tracks
+      .filter(track => track && track.id)
       .map((track) => {
-        const features = featuresMap[track.id];
-        // Audio analysis returns tempo in data.track.tempo
-        const bpm = features?.tempo ? Math.round(features.tempo) : null;
-        
-        // Get artist name (first artist)
         const artist = track.artists && track.artists.length > 0
           ? track.artists[0].name
           : 'Unknown Artist';
-        
-        // Get album art
-        const albumArt = getAlbumArt(track.album);
         
         return {
           id: track.id,
           title: track.name || 'Unknown Title',
           artist,
-          bpm: bpm || 120, // Default to 120 if no BPM available
-          time: formatDuration(track.duration_ms || 0),
-          expectedPace: bpm ? calculateExpectedPace(bpm) : '',
-          albumArt,
-          spotifyUri: track.uri,
-          spotifyId: track.id,
-          spotifyUrl: track.external_urls?.spotify || '',
+          duration_ms: track.duration_ms || 0,
+          album: track.album,
+          uri: track.uri,
+          external_urls: track.external_urls,
         };
       });
+    
+    // Prepare songs for GetSong BPM API lookup
+    const songsForBpmLookup = tracksWithInfo.map(track => ({
+      title: track.title,
+      artist: track.artist,
+    }));
+    
+    // Fetch BPMs from GetSong API
+    let songsWithBpm = [];
+    try {
+      console.log(`Fetching BPMs for ${songsForBpmLookup.length} songs from GetSong API...`);
+      songsWithBpm = await batchFetchBpms(songsForBpmLookup);
+      console.log(`Retrieved BPM data for ${songsWithBpm.filter(s => s.bpm !== null).length}/${songsWithBpm.length} songs`);
+    } catch (error) {
+      console.warn('Failed to fetch BPMs from GetSong API, continuing without BPM data:', error.message);
+      console.warn('Tracks will be displayed with default BPM of 120');
+      // Continue without BPM data - create songs with null BPM
+      songsWithBpm = songsForBpmLookup.map(song => ({ ...song, bpm: null }));
+    }
+    
+    // Create a map of title+artist to BPM
+    const bpmMap = {};
+    songsWithBpm.forEach(song => {
+      const key = `${song.title.toLowerCase()}|${song.artist.toLowerCase()}`;
+      bpmMap[key] = song.bpm;
+    });
+    
+    // Map tracks to app format with BPM data from GetSong API
+    const mappedTracks = tracksWithInfo.map((track) => {
+      const key = `${track.title.toLowerCase()}|${track.artist.toLowerCase()}`;
+      const bpm = bpmMap[key] !== null && bpmMap[key] !== undefined 
+        ? bpmMap[key] 
+        : 120; // Default to 120 if no BPM found
+      
+      // Get album art
+      const albumArt = getAlbumArt(track.album);
+      
+      return {
+        id: track.id,
+        title: track.title,
+        artist: track.artist,
+        bpm: bpm,
+        time: formatDuration(track.duration_ms || 0),
+        expectedPace: bpm ? calculateExpectedPace(bpm) : '',
+        albumArt,
+        spotifyUri: track.uri,
+        spotifyId: track.id,
+        spotifyUrl: track.external_urls?.spotify || '',
+      };
+    });
     
     // Sort by BPM (descending)
     mappedTracks.sort((a, b) => b.bpm - a.bpm);
     
+    const tracksWithRealBpm = mappedTracks.filter(t => {
+      const key = `${t.title.toLowerCase()}|${t.artist.toLowerCase()}`;
+      return bpmMap[key] !== null && bpmMap[key] !== undefined && bpmMap[key] !== 120;
+    });
     console.log(`✅ Successfully mapped ${mappedTracks.length} tracks`);
-    if (audioFeatures.length === 0) {
-      console.log('ℹ️  All tracks using default BPM of 120 (audio-analysis endpoint unavailable or failed)');
+    if (tracksWithRealBpm.length === 0) {
+      console.log('ℹ️  All tracks using default BPM of 120 (GetSong API unavailable or no matches found)');
     } else {
-      console.log(`ℹ️  ${audioFeatures.length} tracks have real BPM data from audio-analysis, ${mappedTracks.length - audioFeatures.length} using default BPM`);
+      console.log(`ℹ️  ${tracksWithRealBpm.length} tracks have real BPM data from GetSong API, ${mappedTracks.length - tracksWithRealBpm.length} using default BPM`);
     }
     return mappedTracks;
   } catch (error) {

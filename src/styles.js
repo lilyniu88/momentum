@@ -630,5 +630,24 @@ export const runningPageStyles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  // GetSong BPM API Credit Footer
+  creditFooter: {
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    marginTop: 20,
+    marginBottom: 20,
+  },
+  creditText: {
+    fontSize: 12,
+    color: '#666666',
+    textAlign: 'center',
+    fontFamily: Platform.OS === 'web' ? 'Figtree, sans-serif' : undefined,
+  },
+  creditLink: {
+    color: '#5809C0',
+    textDecorationLine: 'underline',
+    fontFamily: Platform.OS === 'web' ? 'Figtree, sans-serif' : undefined,
+  },
 })
 

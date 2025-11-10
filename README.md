@@ -142,3 +142,7 @@ momentum/
 
 MIT
 
+## Credits
+
+BPM data powered by [GetSong BPM](https://getsongbpm.com)
+
