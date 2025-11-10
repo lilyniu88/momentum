@@ -101,94 +101,81 @@ const getTopTracks = async (options = {}) => {
 };
 
 /**
- * Get audio features for a single track
- * Try individual track requests - sometimes batch endpoint is blocked but individual works
+ * Get audio analysis for a single track
+ * Uses /audio-analysis endpoint which provides tempo (BPM) data
+ * Reference: https://developer.spotify.com/documentation/web-api/reference/get-audio-analysis
  */
-const getSingleTrackAudioFeatures = async (trackId) => {
+const getSingleTrackAudioAnalysis = async (trackId) => {
   try {
-    const data = await makeRequest(`/audio-features/${trackId}`);
-    return data;
+    const data = await makeRequest(`/audio-analysis/${trackId}`);
+    // Extract tempo from track object in the response
+    if (data && data.track && data.track.tempo) {
+      return {
+        id: trackId,
+        tempo: data.track.tempo,
+        tempo_confidence: data.track.tempo_confidence,
+        // Include other useful data if needed
+        key: data.track.key,
+        mode: data.track.mode,
+        time_signature: data.track.time_signature,
+      };
+    }
+    return null;
   } catch (error) {
-    if (error.message.includes('403')) {
-      return null; // Endpoint not available
+    if (error.message.includes('403') || error.message.includes('404')) {
+      return null; // Endpoint not available or track not found
     }
     throw error;
   }
 };
 
 /**
- * Get audio features for tracks
- * NOTE: Spotify deprecated the audio-features endpoint for new apps (created after Nov 27, 2024)
- * This function tries batch requests first, then falls back to individual requests
+ * Get audio analysis (BPM/tempo) for tracks using /audio-analysis endpoint
+ * This endpoint is available even for new Spotify apps (unlike /audio-features)
+ * Returns tempo (BPM) data extracted from the audio-analysis response
+ * Reference: https://developer.spotify.com/documentation/web-api/reference/get-audio-analysis
+ * 
+ * @param {Array<string>} trackIds - Array of Spotify track IDs
+ * @returns {Promise<Array>} - Array of objects with { id, tempo, tempo_confidence, ... }
  */
 const getAudioFeatures = async (trackIds) => {
   if (!trackIds || trackIds.length === 0) {
     return [];
   }
   
-  // First, try batch request (faster if it works)
-  try {
-    const chunks = [];
-    for (let i = 0; i < trackIds.length; i += 100) {
-      chunks.push(trackIds.slice(i, i + 100));
-    }
-    
-    const allFeatures = [];
-    for (let i = 0; i < chunks.length; i++) {
-      const chunk = chunks[i];
-      const ids = chunk.join(',');
-      console.log(`Trying batch audio features for ${chunk.length} tracks (chunk ${i + 1}/${chunks.length})`);
-      
-      const params = new URLSearchParams({ ids: ids });
-      const data = await makeRequest(`/audio-features?${params.toString()}`);
-      
-      if (data && data.audio_features) {
-        const validFeatures = data.audio_features.filter(f => f !== null);
-        allFeatures.push(...validFeatures);
-        console.log(`✅ Batch request succeeded! Retrieved ${validFeatures.length} audio features`);
-      }
-    }
-    
-    if (allFeatures.length > 0) {
-      return allFeatures;
-    }
-  } catch (error) {
-    if (error.message.includes('403')) {
-      console.warn('Batch audio-features endpoint blocked (403). Trying individual track requests...');
-    } else {
-      console.warn('Batch request failed, trying individual requests:', error.message);
-    }
-  }
+  console.log(`Fetching audio analysis (BPM) for ${trackIds.length} tracks using /audio-analysis endpoint...`);
   
-  // If batch failed, try individual track requests (slower but might work)
-  console.log('Attempting individual track audio-features requests...');
   const allFeatures = [];
-  const maxIndividualRequests = 20; // Limit to avoid too many API calls
+  const maxRequests = 50; // Limit to avoid rate limiting
   
-  for (let i = 0; i < Math.min(trackIds.length, maxIndividualRequests); i++) {
+  // Process tracks in smaller batches with delays
+  for (let i = 0; i < Math.min(trackIds.length, maxRequests); i++) {
     const trackId = trackIds[i];
     try {
-      const features = await getSingleTrackAudioFeatures(trackId);
-      if (features && features.tempo) {
-        allFeatures.push(features);
+      const analysis = await getSingleTrackAudioAnalysis(trackId);
+      if (analysis && analysis.tempo) {
+        allFeatures.push(analysis);
       }
       
-      // Add small delay to avoid rate limiting
-      if (i < Math.min(trackIds.length, maxIndividualRequests) - 1) {
-        await new Promise(resolve => setTimeout(resolve, 100)); // 100ms delay
+      // Add delay between requests to avoid rate limiting (Spotify allows ~100 requests/second)
+      if (i < Math.min(trackIds.length, maxRequests) - 1) {
+        await new Promise(resolve => setTimeout(resolve, 50)); // 50ms delay = ~20 requests/second
       }
     } catch (error) {
       // Skip this track and continue
-      console.warn(`Failed to get features for track ${i + 1}:`, error.message);
+      console.warn(`Failed to get audio analysis for track ${i + 1}/${trackIds.length}:`, error.message);
+    }
+    
+    // Log progress every 10 tracks
+    if ((i + 1) % 10 === 0) {
+      console.log(`Progress: ${i + 1}/${Math.min(trackIds.length, maxRequests)} tracks analyzed`);
     }
   }
   
   if (allFeatures.length === 0) {
-    console.warn('⚠️  Audio features endpoint not available (403). This is expected for new Spotify apps.');
-    console.warn('Spotify deprecated audio-features for apps created after Nov 27, 2024.');
-    console.warn('Tracks will use default BPM of 120.');
+    console.warn('⚠️  Could not retrieve audio analysis. Tracks will use default BPM of 120.');
   } else {
-    console.log(`✅ Retrieved ${allFeatures.length} audio features using individual requests`);
+    console.log(`✅ Retrieved BPM data for ${allFeatures.length} tracks using /audio-analysis endpoint`);
   }
   
   return allFeatures;
@@ -259,25 +246,26 @@ const fetchTopTracksWithFeatures = async (options = {}) => {
     
     // Extract track IDs
     const trackIds = tracks.map(track => track.id).filter(Boolean);
-    console.log(`Fetching audio features for ${trackIds.length} tracks`);
+    console.log(`Fetching audio analysis (BPM) for ${trackIds.length} tracks`);
     
     if (trackIds.length === 0) {
       console.warn('No valid track IDs found');
       return [];
     }
     
-    // Get audio features (optional - continue even if it fails)
+    // Get audio analysis (BPM/tempo) using /audio-analysis endpoint
+    // This endpoint is available for new Spotify apps
     let audioFeatures = [];
     try {
       audioFeatures = await getAudioFeatures(trackIds);
-      console.log(`Retrieved audio features for ${audioFeatures?.length || 0} tracks`);
+      console.log(`Retrieved BPM data from audio analysis for ${audioFeatures?.length || 0} tracks`);
     } catch (error) {
-      console.warn('Failed to fetch audio features, continuing without BPM data:', error.message);
+      console.warn('Failed to fetch audio analysis, continuing without BPM data:', error.message);
       console.warn('Tracks will be displayed with default BPM of 120');
-      // Continue without audio features - tracks will have default BPM
+      // Continue without BPM data - tracks will have default BPM
     }
     
-    // Create a map of track ID to audio features
+    // Create a map of track ID to audio analysis data (contains tempo/BPM)
     const featuresMap = {};
     if (audioFeatures && Array.isArray(audioFeatures)) {
       audioFeatures.forEach((features) => {
@@ -292,6 +280,7 @@ const fetchTopTracksWithFeatures = async (options = {}) => {
       .filter(track => track && track.id) // Filter out invalid tracks
       .map((track) => {
         const features = featuresMap[track.id];
+        // Audio analysis returns tempo in data.track.tempo
         const bpm = features?.tempo ? Math.round(features.tempo) : null;
         
         // Get artist name (first artist)
@@ -321,9 +310,9 @@ const fetchTopTracksWithFeatures = async (options = {}) => {
     
     console.log(`✅ Successfully mapped ${mappedTracks.length} tracks`);
     if (audioFeatures.length === 0) {
-      console.log('ℹ️  All tracks using default BPM of 120 (audio-features endpoint unavailable)');
+      console.log('ℹ️  All tracks using default BPM of 120 (audio-analysis endpoint unavailable or failed)');
     } else {
-      console.log(`ℹ️  ${audioFeatures.length} tracks have real BPM data, ${mappedTracks.length - audioFeatures.length} using default BPM`);
+      console.log(`ℹ️  ${audioFeatures.length} tracks have real BPM data from audio-analysis, ${mappedTracks.length - audioFeatures.length} using default BPM`);
     }
     return mappedTracks;
   } catch (error) {

@@ -24,100 +24,6 @@ import {
 } from './services/spotifyAuth'
 import { fetchTopTracksWithFeatures } from './services/spotifyApi'
 
-// All available songs (in a real app, this would come from Spotify API)
-const allSongs = [
-    {
-      id: 1,
-      title: "360",
-      artist: "Charli XCX",
-      bpm: 181,
-      time: "2:14",
-      expectedPace: "6:14",
-      albumArt: "brat"
-    },
-    {
-      id: 2,
-      title: "HUMBLE.",
-      artist: "Kendrick Lamar",
-      bpm: 182,
-      time: "2:57",
-      expectedPace: "6:09",
-      albumArt: "damn"
-    },
-    {
-      id: 3,
-      title: "IS IT",
-      artist: "Tyla",
-      bpm: 189,
-      time: "2:44",
-      expectedPace: "6:08",
-      albumArt: "tyla"
-    },
-    {
-      id: 4,
-      title: "MY HOUSE",
-      artist: "Beyoncé",
-      bpm: 142,
-      time: "4:23",
-      expectedPace: "9:23",
-      albumArt: "beyonce"
-    },
-    {
-      id: 5,
-      title: "DNA.",
-      artist: "Kendrick Lamar",
-      bpm: 140,
-      time: "3:06",
-      expectedPace: "9:42",
-      albumArt: "damn"
-    },
-    {
-      id: 6,
-      title: "365",
-      artist: "Charli XCX",
-      bpm: 181,
-      time: "2:18",
-      expectedPace: "6:12",
-      albumArt: "brat"
-  },
-  {
-    id: 7,
-    title: "Party in the U.S.A.",
-    artist: "Miley Cyrus",
-    bpm: 100,
-    time: "3:22",
-    expectedPace: "10:00",
-    albumArt: "miley"
-  },
-  {
-    id: 8,
-    title: "Fireball",
-    artist: "Pitbull",
-    bpm: 128,
-    time: "3:24",
-    expectedPace: "8:00",
-    albumArt: "pitbull"
-  },
-  {
-    id: 9,
-    title: "Good as Hell",
-    artist: "Lizzo",
-    bpm: 120,
-    time: "2:39",
-    expectedPace: "8:30",
-    albumArt: "lizzo"
-  },
-  {
-    id: 10,
-    title: "Levitating",
-    artist: "Dua Lipa",
-    bpm: 103,
-    time: "3:23",
-    expectedPace: "9:45",
-    albumArt: "dua"
-  }
-]
-
 function Playlist({ distance, intensity }) {
   const [showRunningPage, setShowRunningPage] = useState(false)
   const [currentSongIndex, setCurrentSongIndex] = useState(0)
@@ -246,8 +152,8 @@ function Playlist({ distance, intensity }) {
     }
   }
 
-  // Use Spotify songs if available, otherwise fallback to allSongs
-  const availableSongs = spotifySongs.length > 0 ? spotifySongs : allSongs
+  // Use only Spotify songs (no hardcoded fallback)
+  const availableSongs = spotifySongs
 
   // Generate filtered playlist based on distance and intensity preferences
   const songs = useMemo(() => {
@@ -257,6 +163,11 @@ function Playlist({ distance, intensity }) {
       intensity,
       isSpotify: spotifySongs.length > 0
     })
+    
+    // If no songs available, return empty array
+    if (availableSongs.length === 0) {
+      return []
+    }
     
     const filtered = generatePlaylist(availableSongs, distance, intensity)
     
@@ -320,42 +231,18 @@ function Playlist({ distance, intensity }) {
     )
   }
 
-  const getAlbumArtText = (albumArt) => {
-    // If albumArt is a URL (from Spotify), extract first letter from URL or use default
+  const getAlbumArtText = (albumArt, title) => {
+    // If albumArt is a URL (from Spotify), use first letter of title
     if (typeof albumArt === 'string' && albumArt.startsWith('http')) {
-      return '♪'
+      return title?.charAt(0)?.toUpperCase() || '♪'
     }
-    
-    const map = {
-      'brat': 'brat',
-      'damn': 'DAMN.',
-      'tyla': 'T',
-      'beyonce': 'B',
-      'miley': 'M',
-      'pitbull': 'P',
-      'lizzo': 'L',
-      'dua': 'D'
-    }
-    return map[albumArt] || 'A'
+    // Otherwise use first letter of title
+    return title?.charAt(0)?.toUpperCase() || 'A'
   }
 
   const getAlbumArtColor = (albumArt) => {
-    // If albumArt is a URL (from Spotify), use default color
-    if (typeof albumArt === 'string' && albumArt.startsWith('http')) {
-      return '#5809C0'
-    }
-    
-    const map = {
-      'brat': '#22c55e',
-      'damn': '#e5e7eb',
-      'tyla': '#fbbf24',
-      'beyonce': '#1a1a1a',
-      'miley': '#fef3c7',
-      'pitbull': '#5809C0',
-      'lizzo': '#7BF0FF',
-      'dua': '#D3C2F7'
-    }
-    return map[albumArt] || '#EFEFEF'
+    // Use default color for all tracks (Spotify tracks will have URLs)
+    return '#EFEFEF'
   }
 
   // Open track in Spotify
@@ -375,14 +262,9 @@ function Playlist({ distance, intensity }) {
     }
   }
 
-  const getAlbumArtTextColor = (albumArt) => {
-    const darkBackgrounds = ['damn', 'beyonce', 'pitbull']
-    return darkBackgrounds.includes(albumArt) ? '#FFFFFF' : '#000000'
-  }
-
   const renderTrack = ({ item: song }) => {
     const albumArtColor = getAlbumArtColor(song.albumArt)
-    const albumArtTextColor = getAlbumArtTextColor(song.albumArt)
+    const albumArtText = getAlbumArtText(song.albumArt, song.title)
 
     return (
       <Pressable 
@@ -395,8 +277,8 @@ function Playlist({ distance, intensity }) {
       >
         <View style={styles.trackTitleCol}>
           <View style={[styles.trackThumbnail, { backgroundColor: albumArtColor }]}>
-            <Text style={[styles.thumbnailText, { color: albumArtTextColor }]}>
-              {getAlbumArtText(song.albumArt)}
+            <Text style={[styles.thumbnailText, { color: '#000000' }]}>
+              {albumArtText}
             </Text>
           </View>
           <View style={styles.trackInfo}>
@@ -431,18 +313,20 @@ function Playlist({ distance, intensity }) {
         <View style={styles.playlistInfoSection}>
           <View>
             <View style={styles.albumArtGrid}>
-              <View style={[styles.albumArt, { backgroundColor: '#22c55e' }]}>
-                <Text style={styles.albumArtText}>brat</Text>
-              </View>
-              <View style={[styles.albumArt, { backgroundColor: '#e5e7eb' }]}>
-                <Text style={[styles.albumArtText, styles.albumArtTextDark]}>DAMN.</Text>
-              </View>
-              <View style={[styles.albumArt, { backgroundColor: '#1f2937' }]}>
-                <Text style={styles.albumArtText}>F</Text>
-              </View>
-              <View style={[styles.albumArt, { backgroundColor: '#fef3c7' }]}>
-                <Text style={[styles.albumArtText, styles.albumArtTextDark]}>L</Text>
-              </View>
+              {/* Show first 4 tracks' album art or placeholder */}
+              {songs.slice(0, 4).map((song, index) => (
+                <View key={song.id || index} style={[styles.albumArt, { backgroundColor: '#EFEFEF' }]}>
+                  <Text style={[styles.albumArtText, { color: '#000000' }]}>
+                    {song.title?.charAt(0)?.toUpperCase() || '♪'}
+                  </Text>
+                </View>
+              ))}
+              {/* Fill remaining slots if less than 4 songs */}
+              {Array.from({ length: Math.max(0, 4 - songs.length) }).map((_, index) => (
+                <View key={`placeholder-${index}`} style={[styles.albumArt, { backgroundColor: '#EFEFEF' }]}>
+                  <Text style={[styles.albumArtText, { color: '#000000' }]}>♪</Text>
+                </View>
+              ))}
             </View>
             <Text style={styles.playlistSummary}>
               {songs.length} songs, {totalMinutes} min
