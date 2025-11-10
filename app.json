@@ -1,7 +1,14 @@
 {
   "expo": {
     "name": "momentum",
-    "slug": "momentum"
+    "slug": "momentum",
+    "owner": "zianasundrani",
+    "scheme": "momentum",
+    "ios": {
+      "bundleIdentifier": "com.ziana.momentum"
+    },
+    "android": {
+      "package": "com.ziana.momentum"
+    }
   }
 }
-

@@ -1,5 +1,6 @@
 import { registerRootComponent } from 'expo';
 import QuickRun from './src/QuickRun';
+import SpotifyPage from './src/SpotifyPage';
 
-registerRootComponent(QuickRun);
+registerRootComponent(SpotifyPage);
 
