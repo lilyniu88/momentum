@@ -4,6 +4,7 @@ A modern React Native running app that generates personalized playlists based on
 
 ##To run the app:
 npm install 
+
 npx expo start
 
 ## To run the Spotify API: 
