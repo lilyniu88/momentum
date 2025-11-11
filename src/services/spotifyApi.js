@@ -255,25 +255,6 @@ const calculateExpectedPace = (bpm) => {
 };
 
 /**
- * Get album art URL or generate a tag
- */
-const getAlbumArt = (album) => {
-  if (album?.images && album.images.length > 0) {
-    return album.images[0].url;
-  }
-  
-  // Generate a simple tag from album name
-  if (album?.name) {
-    const words = album.name.split(' ');
-    if (words.length > 0) {
-      return words[0].substring(0, 1).toLowerCase();
-    }
-  }
-  
-  return 'default';
-};
-
-/**
  * Fetch top tracks with audio features and map to app format
  */
 const fetchTopTracksWithFeatures = async (options = {}) => {
@@ -315,9 +296,6 @@ const fetchTopTracksWithFeatures = async (options = {}) => {
         ? track.artists[0].name
         : 'Unknown Artist';
       
-      // Get album art (URL from track.album.images if available)
-      const albumArt = getAlbumArt(track.album);
-      
       return {
         id: track.id,
           title: track.name || 'Unknown Title',
@@ -325,7 +303,6 @@ const fetchTopTracksWithFeatures = async (options = {}) => {
         bpm: bpm || 120, // Default to 120 if no BPM available
           time: formatDuration(track.duration_ms || 0),
         expectedPace: bpm ? calculateExpectedPace(bpm) : '',
-        albumArt,
         albumId: track.album?.id || null, // Store album ID for fetching cover art
         albumImageUrl: track.album?.images?.[0]?.url || null, // Use image from track if available
         spotifyUri: track.uri,

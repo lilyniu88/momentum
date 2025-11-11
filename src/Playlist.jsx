@@ -308,17 +308,13 @@ function Playlist({ distance, intensity }) {
     )
   }
 
-  const getAlbumArtText = (albumArt, title) => {
-    // If albumArt is a URL (from Spotify), use first letter of title
-    if (typeof albumArt === 'string' && albumArt.startsWith('http')) {
-      return title?.charAt(0)?.toUpperCase() || '♪'
-    }
-    // Otherwise use first letter of title
-    return title?.charAt(0)?.toUpperCase() || 'A'
+  const getAlbumArtText = (title) => {
+    // Use first letter of title as fallback text
+    return title?.charAt(0)?.toUpperCase() || '♪'
   }
 
-  const getAlbumArtColor = (albumArt) => {
-    // Use default color for all tracks (Spotify tracks will have URLs)
+  const getAlbumArtColor = () => {
+    // Use default color for all tracks
     return '#EFEFEF'
   }
 
@@ -342,8 +338,8 @@ function Playlist({ distance, intensity }) {
   const renderTrack = ({ item: song }) => {
     // Get album image URL - prefer albumImageUrl from track, then fetched URL, then fallback
     const albumImageUrl = song.albumImageUrl || (song.albumId ? albumArtUrls[song.albumId] : null)
-    const albumArtColor = getAlbumArtColor(song.albumArt)
-    const albumArtText = getAlbumArtText(song.albumArt, song.title)
+    const albumArtColor = getAlbumArtColor()
+    const albumArtText = getAlbumArtText(song.title)
 
     return (
       <Pressable 
