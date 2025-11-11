@@ -1,5 +1,5 @@
 import { registerRootComponent } from 'expo';
-import QuickRun from './src/QuickRun';
+import PaceVisualization from './src/PaceVisualization';
 
-registerRootComponent(QuickRun);
+registerRootComponent(PaceVisualization);
 

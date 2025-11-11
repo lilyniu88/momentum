@@ -1,0 +1,408 @@
+import React, { useState, useMemo } from 'react'
+import {
+  View,
+  Text,
+  ScrollView,
+  Pressable,
+  Dimensions,
+  StyleSheet,
+} from 'react-native'
+import { LineChart } from 'react-native-chart-kit'
+import { MaterialIcons } from '@expo/vector-icons'
+
+const screenWidth = Dimensions.get('window').width
+
+/**
+ * Convert pace string (e.g., "6:30") to seconds per mile
+ */
+const paceToSeconds = (paceString) => {
+  const [minutes, seconds] = paceString.split(':').map(Number)
+  return minutes * 60 + seconds
+}
+
+/**
+ * Convert seconds per mile to pace string
+ */
+const secondsToPace = (seconds) => {
+  const mins = Math.floor(seconds / 60)
+  const secs = Math.floor(seconds % 60)
+  return `${mins}:${String(secs).padStart(2, '0')}`
+}
+
+/**
+ * Format time in seconds to MM:SS
+ */
+const formatTime = (totalSeconds) => {
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+  return `${minutes}:${String(seconds).padStart(2, '0')}`
+}
+
+/**
+ * Standalone Pace Visualization Component
+ * Shows distance vs pace graph with tap-to-see-song functionality
+ */
+function PaceVisualization() {
+  // Mock workout data - in a real app, this would come from stored workout history
+  const mockWorkoutData = useMemo(() => {
+    const songs = [
+      { id: 1, title: '365', artist: 'Charli XCX', bpm: 128 },
+      { id: 2, title: 'HUMBLE.', artist: 'Kendrick Lamar', bpm: 150 },
+      { id: 3, title: 'Water', artist: 'Tyla', bpm: 120 },
+      { id: 4, title: 'ME!', artist: 'Taylor Swift', bpm: 95 },
+      { id: 5, title: '360', artist: 'Charli XCX', bpm: 130 },
+    ]
+
+    // Generate pace data points for each mile (6 miles total)
+    // Each data point represents pace for that mile
+    const dataPoints = []
+    const totalMiles = 6
+
+    // Map songs to miles (cycle through songs)
+    for (let mile = 1; mile <= totalMiles; mile++) {
+      const songIndex = (mile - 1) % songs.length
+      const song = songs[songIndex]
+
+      // Simulate pace variation based on song BPM
+      // Higher BPM generally correlates with faster pace
+      const basePace = 420 // 7:00 min/mile in seconds
+      const bpmFactor = (song.bpm - 120) / 10 // Adjust pace based on BPM
+      const paceVariation = Math.random() * 15 - 7.5 // Random variation ±7.5 seconds
+      const paceSeconds = basePace - (bpmFactor * 3) + paceVariation
+
+      dataPoints.push({
+        distance: mile, // miles
+        pace: paceSeconds, // seconds per mile
+        songId: song.id,
+        song: song,
+      })
+    }
+
+    return { dataPoints, songs }
+  }, [])
+
+  const [selectedPoint, setSelectedPoint] = useState(null)
+
+  // Prepare chart data
+  const chartData = useMemo(() => {
+    const labels = []
+    const data = []
+
+    mockWorkoutData.dataPoints.forEach((point) => {
+      // X-axis labels show mile numbers
+      labels.push(`${point.distance}`)
+      data.push(point.pace)
+    })
+
+    return {
+      labels,
+      datasets: [
+        {
+          data,
+          color: (opacity = 1) => `rgba(88, 9, 192, ${opacity})`, // Purple color
+          strokeWidth: 2,
+        },
+      ],
+    }
+  }, [mockWorkoutData])
+
+  // Handle chart press
+  const handleChartPress = (data) => {
+    if (data && data.x !== undefined) {
+      const index = Math.floor(data.x)
+      if (index >= 0 && index < mockWorkoutData.dataPoints.length) {
+        const point = mockWorkoutData.dataPoints[index]
+        setSelectedPoint(point)
+      }
+    }
+  }
+
+  const chartConfig = {
+    backgroundColor: '#FFFFFF',
+    backgroundGradientFrom: '#FFFFFF',
+    backgroundGradientTo: '#FFFFFF',
+    decimalPlaces: 0,
+    color: (opacity = 1) => `rgba(88, 9, 192, ${opacity})`,
+    labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+    style: {
+      borderRadius: 16,
+    },
+    propsForDots: {
+      r: '4',
+      strokeWidth: '2',
+      stroke: '#5809C0',
+    },
+    formatYLabel: (value) => {
+      const seconds = parseFloat(value)
+      return secondsToPace(seconds)
+    },
+  }
+
+  return (
+    <View style={styles.container}>
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.title}>Distance vs Pace</Text>
+          <Text style={styles.subtitle}>Tap on the graph to see what song was playing at each mile</Text>
+        </View>
+
+        {/* Chart */}
+        <View style={styles.chartContainer}>
+          <LineChart
+            data={chartData}
+            width={screenWidth - 40}
+            height={300}
+            chartConfig={chartConfig}
+            bezier
+            style={styles.chart}
+            onDataPointClick={handleChartPress}
+            yAxisLabel=""
+            yAxisSuffix=""
+            segments={4}
+            withInnerLines={true}
+            withOuterLines={true}
+            withVerticalLabels={true}
+            withHorizontalLabels={true}
+            withDots={true}
+            withShadow={false}
+          />
+          {/* Transparent overlay for better tap detection */}
+          <Pressable
+            style={styles.chartOverlay}
+            onPress={(event) => {
+              const { locationX } = event.nativeEvent
+              const chartWidth = screenWidth - 40
+              const paddingLeft = 60 // Approximate left padding for y-axis
+              const chartAreaWidth = chartWidth - paddingLeft - 20
+              const relativeX = locationX - paddingLeft
+              
+              if (relativeX >= 0 && relativeX <= chartAreaWidth) {
+                // Calculate which mile was tapped (6 data points total)
+                const dataPointIndex = Math.round(
+                  (relativeX / chartAreaWidth) * (mockWorkoutData.dataPoints.length - 1)
+                )
+                const clampedIndex = Math.max(0, Math.min(dataPointIndex, mockWorkoutData.dataPoints.length - 1))
+                const point = mockWorkoutData.dataPoints[clampedIndex]
+                setSelectedPoint(point)
+              }
+            }}
+          />
+        </View>
+
+        {/* Axis labels */}
+        <View style={styles.axisLabelsContainer}>
+          <Text style={styles.yAxisLabel}>Pace (min/mi)</Text>
+          <Text style={styles.xAxisLabel}>Distance (miles)</Text>
+        </View>
+
+        {/* Selected Point Info */}
+        {selectedPoint && (
+          <View style={styles.infoCard}>
+            <View style={styles.infoHeader}>
+              <MaterialIcons name="music-note" size={24} color="#5809C0" />
+              <Text style={styles.infoTitle}>Song at Mile {selectedPoint.distance}</Text>
+            </View>
+            <View style={styles.infoContent}>
+              <Text style={styles.songTitle}>{selectedPoint.song.title}</Text>
+              <Text style={styles.songArtist}>{selectedPoint.song.artist}</Text>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Pace:</Text>
+                <Text style={styles.infoValue}>{secondsToPace(selectedPoint.pace)} min/mi</Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>BPM:</Text>
+                <Text style={styles.infoValue}>{selectedPoint.song.bpm}</Text>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {/* Instructions */}
+        <View style={styles.instructions}>
+          <Text style={styles.instructionsText}>
+            Tap anywhere on the graph to see which song was playing at that mile
+          </Text>
+        </View>
+
+        {/* Workout Summary */}
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryTitle}>Workout Summary</Text>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Total Distance:</Text>
+            <Text style={styles.summaryValue}>
+              {mockWorkoutData.dataPoints.length} miles
+            </Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Songs Played:</Text>
+            <Text style={styles.summaryValue}>
+              {new Set(mockWorkoutData.dataPoints.map(p => p.songId)).size}
+            </Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Avg Pace:</Text>
+            <Text style={styles.summaryValue}>
+              {secondsToPace(
+                mockWorkoutData.dataPoints.reduce((sum, p) => sum + p.pace, 0) /
+                  mockWorkoutData.dataPoints.length
+              )}{' '}
+              min/mi
+            </Text>
+          </View>
+        </View>
+      </ScrollView>
+    </View>
+  )
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: 20,
+    paddingBottom: 40,
+  },
+  header: {
+    marginBottom: 24,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#000000',
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#666666',
+  },
+  chartContainer: {
+    alignItems: 'center',
+    marginVertical: 20,
+    backgroundColor: '#F8F8F8',
+    borderRadius: 12,
+    padding: 10,
+    position: 'relative',
+  },
+  chart: {
+    marginVertical: 8,
+    borderRadius: 16,
+  },
+  chartOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'transparent',
+  },
+  axisLabelsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: -20,
+    marginBottom: 20,
+    paddingHorizontal: 20,
+  },
+  yAxisLabel: {
+    fontSize: 14,
+    color: '#666666',
+    fontWeight: '500',
+  },
+  xAxisLabel: {
+    fontSize: 14,
+    color: '#666666',
+    fontWeight: '500',
+  },
+  infoCard: {
+    backgroundColor: '#F8F8F8',
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 20,
+    marginBottom: 20,
+  },
+  infoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  infoTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#000000',
+    marginLeft: 8,
+  },
+  infoContent: {
+    marginTop: 8,
+  },
+  songTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#000000',
+    marginBottom: 4,
+  },
+  songArtist: {
+    fontSize: 16,
+    color: '#666666',
+    marginBottom: 12,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  infoLabel: {
+    fontSize: 14,
+    color: '#666666',
+  },
+  infoValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#000000',
+  },
+  instructions: {
+    backgroundColor: '#E8E0FF',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 20,
+  },
+  instructionsText: {
+    fontSize: 14,
+    color: '#5809C0',
+    textAlign: 'center',
+  },
+  summaryCard: {
+    backgroundColor: '#F8F8F8',
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 10,
+  },
+  summaryTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#000000',
+    marginBottom: 12,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  summaryLabel: {
+    fontSize: 14,
+    color: '#666666',
+  },
+  summaryValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#000000',
+  },
+})
+
+export default PaceVisualization
+
