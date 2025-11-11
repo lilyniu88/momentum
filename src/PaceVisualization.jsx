@@ -8,7 +8,7 @@ import {
   StyleSheet,
 } from 'react-native'
 import { LineChart } from 'react-native-chart-kit'
-import { MaterialIcons } from '@expo/vector-icons'
+import { MaterialIcons, FontAwesome5, FontAwesome6 } from '@expo/vector-icons'
 
 const screenWidth = Dimensions.get('window').width
 
@@ -143,7 +143,10 @@ function PaceVisualization() {
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.title}>Distance vs Pace</Text>
+          <View style={styles.titleContainer}>
+            <FontAwesome5 name="chart-line" size={28} color="#000000" style={styles.titleIcon} solid />
+            <Text style={styles.title}>Distance vs Pace</Text>
+          </View>
           <Text style={styles.subtitle}>Tap on the graph to see what song was playing at each mile</Text>
         </View>
 
@@ -271,11 +274,18 @@ const styles = StyleSheet.create({
   header: {
     marginBottom: 24,
   },
+  titleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  titleIcon: {
+    marginRight: 12,
+  },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
     color: '#000000',
-    marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
