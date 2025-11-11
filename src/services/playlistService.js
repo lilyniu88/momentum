@@ -1,7 +1,10 @@
 /**
  * Playlist Service
  * Handles filtering and generation of playlists based on user preferences
+ * Fetches BPM data from GetSong API and filters by intensity and distance
  */
+
+import { batchFetchBpms } from './getsongBpmApi';
 
 // Helper function to convert time string (e.g., "2:14") to seconds
 const timeToSeconds = (timeString) => {
@@ -21,9 +24,12 @@ const secondsToMinutes = (seconds) => {
  */
 export const getBPMRange = (intensity) => {
   const ranges = {
-    low: { min: 120, max: 140 },
-    medium: { min: 140, max: 160 },
-    high: { min: 160, max: Infinity }
+    // low: { min: 120, max: 140 },
+    // medium: { min: 140, max: 160 },
+    // high: { min: 160, max: Infinity }
+    low: { min: 0, max: 120 },      // Under 120 BPM
+    medium: { min: 120, max: 120 },  // Exactly 120 BPM
+    high: { min: 121, max: Infinity } // Over 120 BPM
   }
   return ranges[intensity] || { min: 0, max: Infinity }
 }
@@ -54,6 +60,12 @@ export const filterByIntensity = (songs, intensity) => {
   const { min, max } = getBPMRange(intensity)
   return songs.filter(song => {
     const bpm = song.bpm || 0
+    // For medium (exactly 120), check equality
+    if (min === 120 && max === 120) {
+      return bpm === 120
+    }
+    // For low (< 120), check bpm < 120
+    // For high (> 120), check bpm > 120
     return bpm >= min && (max === Infinity || bpm < max)
   })
 }
@@ -141,8 +153,141 @@ export const filterByDistance = (songs, distance) => {
 }
 
 /**
+ * Format duration from milliseconds to mm:ss
+ */
+const formatDuration = (ms) => {
+  const totalSeconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+};
+
+/**
+ * Calculate expected pace from BPM
+ */
+const calculateExpectedPace = (bpm) => {
+  if (!bpm || bpm < 60) return '';
+  
+  const basePace = 10; // minutes per mile
+  const paceAdjustment = (bpm - 120) / 20;
+  const expectedPace = Math.max(5, Math.min(15, basePace - paceAdjustment));
+  
+  const minutes = Math.floor(expectedPace);
+  const seconds = Math.round((expectedPace - minutes) * 60);
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+};
+
+/**
+ * Get album art URL or generate a tag
+ */
+const getAlbumArt = (album) => {
+  if (album?.images && album.images.length > 0) {
+    return album.images[0].url;
+  }
+  
+  if (album?.name) {
+    const words = album.name.split(' ');
+    if (words.length > 0) {
+      return words[0].substring(0, 1).toLowerCase();
+    }
+  }
+  
+  return 'default';
+};
+
+/**
+ * Fetch BPMs for tracks and filter by intensity and distance
+ * @param {Array} tracks - Array of Spotify track objects
+ * @param {string} distance - 'short', 'medium', or 'long'
+ * @param {string} intensity - 'low', 'medium', or 'high'
+ * @returns {Promise<Array>} - Filtered playlist with BPM data
+ */
+export const fetchAndFilterPlaylist = async (tracks, distance, intensity) => {
+  if (!tracks || tracks.length === 0) {
+    return [];
+  }
+
+  // First, map tracks to basic format with title and artist
+  const tracksWithInfo = tracks
+    .filter(track => track && track.id)
+    .map((track) => {
+      const artist = track.artists && track.artists.length > 0
+        ? track.artists[0].name
+        : 'Unknown Artist';
+      
+      return {
+        id: track.id,
+        title: track.name || 'Unknown Title',
+        artist,
+        duration_ms: track.duration_ms || 0,
+        album: track.album,
+        uri: track.uri,
+        external_urls: track.external_urls,
+      };
+    });
+
+  // Prepare songs for GetSong BPM API lookup
+  const songsForBpmLookup = tracksWithInfo.map(track => ({
+    title: track.title,
+    artist: track.artist,
+  }));
+
+  // Fetch BPMs from GetSong API
+  let songsWithBpm = [];
+  try {
+    console.log(`Fetching BPMs for ${songsForBpmLookup.length} songs from GetSong API...`);
+    songsWithBpm = await batchFetchBpms(songsForBpmLookup);
+    console.log(`Retrieved BPM data for ${songsWithBpm.filter(s => s.bpm !== null).length}/${songsWithBpm.length} songs`);
+  } catch (error) {
+    console.warn('Failed to fetch BPMs from GetSong API, continuing without BPM data:', error.message);
+    songsWithBpm = songsForBpmLookup.map(song => ({ ...song, bpm: null }));
+  }
+
+  // Create a map of title+artist to BPM
+  const bpmMap = {};
+  songsWithBpm.forEach(song => {
+    const key = `${song.title.toLowerCase()}|${song.artist.toLowerCase()}`;
+    bpmMap[key] = song.bpm;
+  });
+
+  // Map tracks to app format with BPM data from GetSong API
+  const mappedTracks = tracksWithInfo.map((track) => {
+    const key = `${track.title.toLowerCase()}|${track.artist.toLowerCase()}`;
+    const bpm = bpmMap[key] !== null && bpmMap[key] !== undefined 
+      ? bpmMap[key] 
+      : 120; // Default to 120 if no BPM found
+    
+    const albumArt = getAlbumArt(track.album);
+    
+    return {
+      id: track.id,
+      title: track.title,
+      artist: track.artist,
+      bpm: bpm,
+      time: formatDuration(track.duration_ms || 0),
+      expectedPace: bpm ? calculateExpectedPace(bpm) : '',
+      albumArt,
+      spotifyUri: track.uri,
+      spotifyId: track.id,
+      spotifyUrl: track.external_urls?.spotify || '',
+    };
+  });
+
+  // Filter by intensity (BPM)
+  let filteredSongs = filterByIntensity(mappedTracks, intensity);
+  
+  // Filter by distance (duration)
+  filteredSongs = filterByDistance(filteredSongs, distance);
+
+  // Sort by BPM (descending)
+  filteredSongs.sort((a, b) => b.bpm - a.bpm);
+
+  return filteredSongs;
+};
+
+/**
  * Generate a filtered playlist based on distance and intensity preferences
- * @param {Array} allSongs - Array of all available songs
+ * @param {Array} allSongs - Array of all available songs (already with BPM data)
  * @param {string} distance - 'short', 'medium', or 'long'
  * @param {string} intensity - 'low', 'medium', or 'high'
  * @returns {Array} - Filtered and sorted playlist

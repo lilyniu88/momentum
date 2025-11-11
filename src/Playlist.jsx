@@ -11,7 +11,7 @@ import {
 } from 'react-native'
 import { MaterialIcons } from '@expo/vector-icons'
 import { playlistStyles as styles } from './styles'
-import { generatePlaylist } from './services/playlistService'
+import { generatePlaylist, fetchAndFilterPlaylist } from './services/playlistService'
 import RunningPage from './RunningPage'
 import {
   useAuthRequest,
@@ -22,7 +22,7 @@ import {
   clearTokens,
   getRedirectUri,
 } from './services/spotifyAuth'
-import { fetchTopTracksWithFeatures } from './services/spotifyApi'
+import { getTopTracks } from './services/spotifyApi'
 
 function Playlist({ distance, intensity }) {
   const [showRunningPage, setShowRunningPage] = useState(false)
@@ -110,13 +110,23 @@ function Playlist({ distance, intensity }) {
       setIsLoadingSpotify(true)
       setAuthError(null)
       
-      const tracks = await fetchTopTracksWithFeatures({
+      // Get raw tracks from Spotify (without BPM data)
+      const rawTracks = await getTopTracks({
         time_range: 'short_term',
         limit: 50,
       })
       
-      console.log(`✅ Loaded ${tracks?.length || 0} tracks from Spotify`)
-      setSpotifySongs(tracks || [])
+      console.log(`Retrieved ${rawTracks?.length || 0} tracks from Spotify`)
+      
+      // Fetch BPMs and filter by distance/intensity in playlistService
+      const filteredTracks = await fetchAndFilterPlaylist(
+        rawTracks || [],
+        distance,
+        intensity
+      )
+      
+      console.log(`Loaded ${filteredTracks?.length || 0} filtered tracks`)
+      setSpotifySongs(filteredTracks || [])
       setIsLoadingSpotify(false)
     } catch (error) {
       console.error('Error fetching Spotify tracks:', error)
@@ -152,39 +162,17 @@ function Playlist({ distance, intensity }) {
     }
   }
 
-  // Use only Spotify songs (no hardcoded fallback)
-  const availableSongs = spotifySongs
-
-  // Generate filtered playlist based on distance and intensity preferences
+  // Songs are already filtered by fetchAndFilterPlaylist
+  // But if distance/intensity props change, we need to re-filter
   const songs = useMemo(() => {
-    console.log('Generating playlist:', {
-      availableSongsCount: availableSongs.length,
-      distance,
-      intensity,
-      isSpotify: spotifySongs.length > 0
-    })
-    
     // If no songs available, return empty array
-    if (availableSongs.length === 0) {
+    if (spotifySongs.length === 0) {
       return []
     }
     
-    const filtered = generatePlaylist(availableSongs, distance, intensity)
-    
-    console.log('Filtered playlist result:', {
-      filteredCount: filtered.length,
-      originalCount: availableSongs.length
-    })
-    
-    // If filtering removed all Spotify tracks (because they all have default BPM 120),
-    // return them anyway since we don't have real BPM data
-    if (spotifySongs.length > 0 && filtered.length === 0) {
-      console.warn('All Spotify tracks filtered out by intensity. Returning all tracks since BPM data is unavailable.')
-      return availableSongs
-    }
-    
-    return filtered
-  }, [availableSongs, distance, intensity, spotifySongs.length])
+    // Re-filter if distance/intensity changed (tracks already have BPM data)
+    return generatePlaylist(spotifySongs, distance, intensity)
+  }, [spotifySongs, distance, intensity])
 
   const currentSong = songs[currentSongIndex] || songs[0]
 
