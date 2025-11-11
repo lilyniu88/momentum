@@ -285,7 +285,6 @@ const fetchTopTracksWithFeatures = async (options = {}) => {
       return [];
     }
     
-<<<<<<< HEAD
     // First, map tracks to basic format with title and artist
     const tracksWithInfo = tracks
       .filter(track => track && track.id)
@@ -340,7 +339,7 @@ const fetchTopTracksWithFeatures = async (options = {}) => {
       
       // Get album art
       const albumArt = getAlbumArt(track.album);
-      
+
       return {
         id: track.id,
         title: track.title,
@@ -349,6 +348,8 @@ const fetchTopTracksWithFeatures = async (options = {}) => {
         time: formatDuration(track.duration_ms || 0),
         expectedPace: bpm ? calculateExpectedPace(bpm) : '',
         albumArt,
+        albumId: track.album?.id || null, // Store album ID for fetching cover art
+        albumImageUrl: track.album?.images?.[0]?.url || null, // Use image from track if available
         spotifyUri: track.uri,
         spotifyId: track.id,
         spotifyUrl: track.external_urls?.spotify || '',
@@ -362,66 +363,12 @@ const fetchTopTracksWithFeatures = async (options = {}) => {
       const key = `${t.title.toLowerCase()}|${t.artist.toLowerCase()}`;
       return bpmMap[key] !== null && bpmMap[key] !== undefined && bpmMap[key] !== 120;
     });
-    console.log(`✅ Successfully mapped ${mappedTracks.length} tracks`);
+    console.log(`Successfully mapped ${mappedTracks.length} tracks`);
     if (tracksWithRealBpm.length === 0) {
-      console.log('ℹ️  All tracks using default BPM of 120 (GetSong API unavailable or no matches found)');
+      console.log('All tracks using default BPM of 120 (GetSong API unavailable or no matches found)');
     } else {
-      console.log(`ℹ️  ${tracksWithRealBpm.length} tracks have real BPM data from GetSong API, ${mappedTracks.length - tracksWithRealBpm.length} using default BPM`);
+      console.log(`${tracksWithRealBpm.length} tracks have real BPM data from GetSong API, ${mappedTracks.length - tracksWithRealBpm.length} using default BPM`);
     }
-=======
-    const trackIds = tracks.map(track => track.id).filter(Boolean);
-    
-    let audioFeatures = [];
-    try {
-      audioFeatures = await getAudioFeatures(trackIds);
-    } catch (error) {
-      // Continue without BPM data - tracks will have default BPM
-    }
-    
-    // Create a map of track ID to audio features data
-    const featuresMap = {};
-    if (audioFeatures && Array.isArray(audioFeatures)) {
-      audioFeatures.forEach((features) => {
-      if (features && features.id) {
-        featuresMap[features.id] = features;
-      }
-    });
-    }
-    
-    // Map tracks to app format
-    const mappedTracks = tracks
-      .filter(track => track && track.id) // Filter out invalid tracks
-      .map((track) => {
-      const features = featuresMap[track.id];
-      const bpm = features?.tempo ? Math.round(features.tempo) : null;
-      
-      // Get artist name (first artist)
-      const artist = track.artists && track.artists.length > 0
-        ? track.artists[0].name
-        : 'Unknown Artist';
-      
-      // Get album art (URL from track.album.images if available)
-      const albumArt = getAlbumArt(track.album);
-      
-      return {
-        id: track.id,
-          title: track.name || 'Unknown Title',
-        artist,
-        bpm: bpm || 120, // Default to 120 if no BPM available
-          time: formatDuration(track.duration_ms || 0),
-        expectedPace: bpm ? calculateExpectedPace(bpm) : '',
-        albumArt,
-        albumId: track.album?.id || null, // Store album ID for fetching cover art
-        albumImageUrl: track.album?.images?.[0]?.url || null, // Use image from track if available
-        spotifyUri: track.uri,
-        spotifyId: track.id,
-        spotifyUrl: track.external_urls?.spotify || '',
-      };
-    });
-    
-    mappedTracks.sort((a, b) => b.bpm - a.bpm);
-    
->>>>>>> lily-spotify
     return mappedTracks;
   } catch (error) {
     console.error('Error fetching top tracks with features:', error);

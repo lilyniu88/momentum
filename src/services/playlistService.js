@@ -267,6 +267,8 @@ export const fetchAndFilterPlaylist = async (tracks, distance, intensity) => {
       time: formatDuration(track.duration_ms || 0),
       expectedPace: bpm ? calculateExpectedPace(bpm) : '',
       albumArt,
+      albumId: track.album?.id || null, // Store album ID for fetching cover art
+      albumImageUrl: track.album?.images?.[0]?.url || null, // Use image from track if available
       spotifyUri: track.uri,
       spotifyId: track.id,
       spotifyUrl: track.external_urls?.spotify || '',
