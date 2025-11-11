@@ -24,12 +24,24 @@ export const quickRunStyles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#EFEFEF',
   },
+  titleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 40,
+    gap: 12,
+  },
+  titleIcon: {
+    marginRight: 4,
+  },
+  homeIcon: {
+    marginLeft: 4,
+  },
   title: {
     fontSize: 28,
     fontWeight: '700',
     color: '#5809C0',
     textAlign: 'center',
-    marginBottom: 40,
     fontFamily: Platform.OS === 'web' ? 'Figtree, sans-serif' : undefined,
   },
   filters: {
