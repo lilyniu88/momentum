@@ -13,6 +13,7 @@ import { MaterialIcons } from '@expo/vector-icons'
 import { playlistStyles as styles } from './styles'
 import { generatePlaylist, fetchAndFilterPlaylist } from './services/playlistService'
 import RunningPage from './RunningPage'
+import PaceVisualization from './PaceVisualization'
 import {
   useAuthRequest,
   exchangeCodeForTokens,
@@ -24,8 +25,9 @@ import {
 } from './services/spotifyAuth'
 import { fetchTopTracksWithFeatures, getAlbumCoverArt, getTopTracks, startPlayback, getAvailableDevices, transferPlayback } from './services/spotifyApi'
 
-function Playlist({ distance, intensity }) {
+function Playlist({ distance, intensity, onBackToHome }) {
   const [showRunningPage, setShowRunningPage] = useState(false)
+  const [showVisualization, setShowVisualization] = useState(false)
   const [currentSongIndex, setCurrentSongIndex] = useState(0)
   const [authReady, setAuthReady] = useState(false)
   const [spotifySongs, setSpotifySongs] = useState([])
@@ -263,11 +265,25 @@ function Playlist({ distance, intensity }) {
 
   const handleStop = () => {
     setShowRunningPage(false)
+    setShowVisualization(true)
     setCurrentSongIndex(0)
+  }
+
+  const handleCloseVisualization = () => {
+    setShowVisualization(false)
+    // Go back to home screen (QuickRun)
+    if (onBackToHome) {
+      onBackToHome()
+    }
   }
 
   const handleSkip = () => {
     setCurrentSongIndex((prev) => (prev + 1) % songs.length)
+  }
+
+  // Show visualization if run was stopped
+  if (showVisualization) {
+    return <PaceVisualization onClose={handleCloseVisualization} />
   }
 
   // Show running page if play button was clicked

@@ -42,8 +42,15 @@ function QuickRun() {
     return option ? option.label : options[0].label
   }
 
+  const handleBackToHome = () => {
+    setShowPlaylist(false)
+    // Reset filters when coming back
+    setDistance('')
+    setIntensity('')
+  }
+
   if (showPlaylist) {
-    return <Playlist distance={distance} intensity={intensity} />
+    return <Playlist distance={distance} intensity={intensity} onBackToHome={handleBackToHome} />
   }
 
   const renderPickerModal = (options, selectedValue, onSelect, isVisible, onClose) => (

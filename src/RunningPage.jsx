@@ -319,7 +319,15 @@ function RunningPage({ playlistTitle, currentSong, currentSongIndex = 0, allSong
     if (onPause) onPause(!isWorkoutPaused)
   }
 
-  const handleStop = () => {
+  const handleStop = async () => {
+    try {
+      // Stop/pause playback when run is stopped
+      await pausePlayback()
+    } catch (error) {
+      // Continue even if pause fails (e.g., no active device)
+      console.error('Error pausing playback on stop:', error)
+    }
+    // Navigate to visualization
     if (onStop) onStop()
   }
 
