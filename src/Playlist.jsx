@@ -29,6 +29,7 @@ function Playlist({ distance, intensity, onBackToHome }) {
   const [showRunningPage, setShowRunningPage] = useState(false)
   const [showVisualization, setShowVisualization] = useState(false)
   const [currentSongIndex, setCurrentSongIndex] = useState(0)
+  const [workoutData, setWorkoutData] = useState(null)
   const [authReady, setAuthReady] = useState(false)
   const [spotifySongs, setSpotifySongs] = useState([])
   const [isLoadingSpotify, setIsLoadingSpotify] = useState(false)
@@ -263,8 +264,9 @@ function Playlist({ distance, intensity, onBackToHome }) {
     setShowRunningPage(true)
   }
 
-  const handleStop = () => {
+  const handleStop = (data) => {
     setShowRunningPage(false)
+    setWorkoutData(data) // Store workout data with samples
     setShowVisualization(true)
     setCurrentSongIndex(0)
   }
@@ -283,7 +285,7 @@ function Playlist({ distance, intensity, onBackToHome }) {
 
   // Show visualization if run was stopped
   if (showVisualization) {
-    return <PaceVisualization onClose={handleCloseVisualization} />
+    return <PaceVisualization onClose={handleCloseVisualization} workoutData={workoutData} />
   }
 
   // Show running page if play button was clicked

@@ -21,12 +21,21 @@ const formatTime = (totalSeconds) => {
 }
 
 /**
+ * Convert pace string (e.g., "6:30") to seconds per mile
+ */
+const paceToSeconds = (paceString) => {
+  if (paceString === '0:00') return 0
+  const [minutes, seconds] = paceString.split(':').map(Number)
+  return minutes * 60 + seconds
+}
+
+/**
  * Hook for workout data collection
  * Uses GPS-based distance calculation (works in Expo Go)
  * - Distance from GPS → calculates pace
  * Note: BPM comes from the song's BPM
  */
-const useWorkoutData = (isPaused, location = null, isLocationReady = false) => {
+const useWorkoutData = (isPaused, location = null, isLocationReady = false, currentSong = null) => {
   const [workoutData, setWorkoutData] = useState({
     pace: '0:00',
     distance: '0.00',
@@ -39,6 +48,8 @@ const useWorkoutData = (isPaused, location = null, isLocationReady = false) => {
   const previousLocationRef = useRef(null) // For GPS distance calculation
   const locationHistoryRef = useRef([]) // Track recent locations for current pace calculation
   const lastPaceUpdateRef = useRef(0) // Track when we last updated pace
+  const samplesRef = useRef([]) // Track continuous samples for visualization
+  const lastSampleTimeRef = useRef(0) // Track when we last recorded a sample
 
   // Initialize workout when location is ready (not on mount)
   useEffect(() => {
@@ -47,6 +58,8 @@ const useWorkoutData = (isPaused, location = null, isLocationReady = false) => {
       previousLocationRef.current = null
       locationHistoryRef.current = []
       lastPaceUpdateRef.current = 0
+      samplesRef.current = []
+      lastSampleTimeRef.current = 0
       setTotalDistance(0)
       setElapsedSeconds(0)
     }
@@ -140,6 +153,34 @@ const useWorkoutData = (isPaused, location = null, isLocationReady = false) => {
       }))
       
       lastPaceUpdateRef.current = Date.now()
+
+      // Record continuous samples every 10 seconds OR every 0.05 miles (whichever comes first)
+      // This gives us a full sample stream for visualization, even for short runs
+      const now = Date.now()
+      const timeSinceLastSample = (now - lastSampleTimeRef.current) / 1000
+      const distanceSinceLastSample = distanceMiles - (samplesRef.current.length > 0 
+        ? samplesRef.current[samplesRef.current.length - 1].distance 
+        : 0)
+      
+      // Record sample if: 10 seconds passed OR moved 0.05 miles (or first sample)
+      const shouldRecordSample = timeSinceLastSample >= 10 || distanceSinceLastSample >= 0.05 || samplesRef.current.length === 0
+      
+      if (shouldRecordSample) {
+        const paceSeconds = paceToSeconds(currentPace)
+        // Record sample even if pace is 0 or distance is 0 (for stationary/short runs)
+        samplesRef.current.push({
+          distance: parseFloat(distanceMiles.toFixed(3)), // Use 3 decimals for precision
+          pace: paceSeconds, // seconds per mile (0 if no movement)
+          timestamp: now,
+          elapsedSeconds: elapsedSeconds,
+          song: currentSong ? {
+            title: currentSong.title,
+            artist: currentSong.artist,
+            bpm: currentSong.bpm || 0,
+          } : null,
+        })
+        lastSampleTimeRef.current = now
+      }
     }
 
     // Update immediately on start
@@ -159,7 +200,7 @@ const useWorkoutData = (isPaused, location = null, isLocationReady = false) => {
     }))
   }, [elapsedSeconds])
 
-  return workoutData
+  return { workoutData, samples: samplesRef.current }
 }
 
 /**
@@ -273,7 +314,7 @@ function RunningPage({ playlistTitle, currentSong, currentSongIndex = 0, allSong
   // Location is ready when we have a location and map has loaded
   const isLocationReady = !isLoading && location !== null && isMapReady
   
-  const workoutData = useWorkoutData(isWorkoutPaused, location, isLocationReady)
+  const { workoutData, samples } = useWorkoutData(isWorkoutPaused, location, isLocationReady, currentSong)
 
   // Fetch album cover art when current song changes
   useEffect(() => {
@@ -327,8 +368,33 @@ function RunningPage({ playlistTitle, currentSong, currentSongIndex = 0, allSong
       // Continue even if pause fails (e.g., no active device)
       console.error('Error pausing playback on stop:', error)
     }
-    // Navigate to visualization
-    if (onStop) onStop()
+    // Navigate to visualization with sample data
+    if (onStop) {
+      const {
+        metersToMiles,
+      } = require('./services/healthService')
+      
+      const finalDistance = parseFloat(workoutData.distance) || 0
+      
+      // Calculate average pace from samples
+      const calculateAveragePace = (samplePoints) => {
+        if (!samplePoints || samplePoints.length === 0) return '0:00'
+        const validPaces = samplePoints.filter(p => p.pace > 0).map(p => p.pace)
+        if (validPaces.length === 0) return '0:00'
+        const totalPaceSeconds = validPaces.reduce((sum, pace) => sum + pace, 0)
+        const avgPaceSeconds = totalPaceSeconds / validPaces.length
+        const minutes = Math.floor(avgPaceSeconds / 60)
+        const seconds = Math.floor(avgPaceSeconds % 60)
+        return `${minutes}:${String(seconds).padStart(2, '0')}`
+      }
+      
+      onStop({
+        samples: samples,
+        totalDistance: finalDistance,
+        totalTime: workoutData.time,
+        averagePace: calculateAveragePace(samples),
+      })
+    }
   }
 
   const handleSkip = async () => {

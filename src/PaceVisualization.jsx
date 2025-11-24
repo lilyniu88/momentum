@@ -34,63 +34,83 @@ const secondsToPace = (seconds) => {
  * Shows distance vs pace graph with tap-to-see-song functionality
  * Appears after ending a run
  */
-function PaceVisualization({ onClose }) {
-  // Mock workout data
-  const mockWorkoutData = useMemo(() => {
-    const songs = [
-      { id: 1, title: '365', artist: 'Charli XCX', bpm: 128 },
-      { id: 2, title: 'HUMBLE.', artist: 'Kendrick Lamar', bpm: 150 },
-      { id: 3, title: 'Water', artist: 'Tyla', bpm: 120 },
-      { id: 4, title: 'ME!', artist: 'Taylor Swift', bpm: 95 },
-      { id: 5, title: '360', artist: 'Charli XCX', bpm: 130 },
-    ]
+function PaceVisualization({ onClose, workoutData }) {
+  // Use real workout samples if available, otherwise use mock data
+  const samples = useMemo(() => {
+    if (workoutData && workoutData.samples && workoutData.samples.length > 0) {
+      // Use real workout samples
+      return workoutData.samples.map((sample) => ({
+        distance: sample.distance,
+        pace: sample.pace, // already in seconds
+        song: sample.song || { title: 'Unknown', artist: 'Unknown', bpm: 0 },
+        timestamp: sample.timestamp,
+        elapsedSeconds: sample.elapsedSeconds,
+      }))
+    } else {
+      // Fallback to mock data if no real data available
+      const songs = [
+        { id: 1, title: '365', artist: 'Charli XCX', bpm: 128 },
+        { id: 2, title: 'HUMBLE.', artist: 'Kendrick Lamar', bpm: 150 },
+        { id: 3, title: 'Water', artist: 'Tyla', bpm: 120 },
+        { id: 4, title: 'ME!', artist: 'Taylor Swift', bpm: 95 },
+        { id: 5, title: '360', artist: 'Charli XCX', bpm: 130 },
+      ]
 
-    // Generate pace data points for each mile (6 miles total)
-    // Each data point represents pace for that mile
-    const dataPoints = []
-    const totalMiles = 6
+      const dataPoints = []
+      const totalMiles = 6
 
-    // Map songs to miles (cycle through songs)
-    for (let mile = 1; mile <= totalMiles; mile++) {
-      const songIndex = (mile - 1) % songs.length
-      const song = songs[songIndex]
+      for (let mile = 1; mile <= totalMiles; mile++) {
+        const songIndex = (mile - 1) % songs.length
+        const song = songs[songIndex]
+        const basePace = 420
+        const bpmFactor = (song.bpm - 120) / 10
+        const paceVariation = Math.random() * 15 - 7.5
+        const paceSeconds = basePace - (bpmFactor * 3) + paceVariation
 
-      // Simulate pace variation based on song BPM
-      // Higher BPM generally correlates with faster pace
-      const basePace = 420 // 7:00 min/mile in seconds
-      const bpmFactor = (song.bpm - 120) / 10 // Adjust pace based on BPM
-      const paceVariation = Math.random() * 15 - 7.5 // Random variation ±7.5 seconds
-      const paceSeconds = basePace - (bpmFactor * 3) + paceVariation
+        dataPoints.push({
+          distance: mile,
+          pace: paceSeconds,
+          song: song,
+        })
+      }
 
-      dataPoints.push({
-        distance: mile, // miles
-        pace: paceSeconds, // seconds per mile
-        songId: song.id,
-        song: song,
-      })
+      return dataPoints
     }
+  }, [workoutData])
 
-    return { dataPoints, songs }
-  }, [])
+  // Get total distance (use actual max distance from samples, minimum 0.1 for very short runs)
+  const totalDistance = workoutData?.totalDistance 
+    ? Math.max(0.1, workoutData.totalDistance)
+    : (samples.length > 0 ? Math.max(0.1, samples[samples.length - 1].distance) : 0.1)
 
   const [selectedPoint, setSelectedPoint] = useState(null)
 
   // Prepare chart data and calculate Y-axis range
   const { chartData, yAxisLabels } = useMemo(() => {
+    if (samples.length === 0) {
+      return {
+        chartData: { labels: [], datasets: [{ data: [] }] },
+        yAxisLabels: []
+      }
+    }
+
     const labels = []
     const data = []
 
-    mockWorkoutData.dataPoints.forEach((point) => {
-      // X-axis labels show mile numbers
-      labels.push(`${point.distance}`)
-      data.push(point.pace)
+    // Use all samples - continuous distance on x-axis
+    samples.forEach((sample) => {
+      data.push(sample.pace)
+      // Create label from distance (round to 2 decimals for readability)
+      labels.push(sample.distance.toFixed(2))
     })
 
     // Calculate Y-axis range for custom labels
-    const minPace = Math.min(...data)
-    const maxPace = Math.max(...data)
+    // For very short runs or no movement, set a reasonable default range
+    const validPaces = data.filter(p => p > 0)
+    const minPace = validPaces.length > 0 ? Math.min(...validPaces) : 0
+    const maxPace = validPaces.length > 0 ? Math.max(...validPaces) : 600 // Default to 10:00 min/mile
     const range = maxPace - minPace
-    const padding = range * 0.1 // 10% padding
+    const padding = range > 0 ? range * 0.1 : 60 // 10% padding, or 1 minute if flat
     const yMin = Math.max(0, minPace - padding)
     const yMax = maxPace + padding
     const yRange = yMax - yMin
@@ -122,15 +142,34 @@ function PaceVisualization({ onClose }) {
       },
       yAxisLabels,
     }
-  }, [mockWorkoutData])
+  }, [samples])
+
+  // Find the nearest sample to a given distance
+  const findNearestSample = (targetDistance) => {
+    if (samples.length === 0) return null
+    
+    // Find the closest sample by distance
+    let nearest = samples[0]
+    let minDiff = Math.abs(nearest.distance - targetDistance)
+    
+    for (const sample of samples) {
+      const diff = Math.abs(sample.distance - targetDistance)
+      if (diff < minDiff) {
+        minDiff = diff
+        nearest = sample
+      }
+    }
+    
+    return nearest
+  }
 
   // Handle chart press
   const handleChartPress = (data) => {
     if (data && data.x !== undefined) {
       const index = Math.floor(data.x)
-      if (index >= 0 && index < mockWorkoutData.dataPoints.length) {
-        const point = mockWorkoutData.dataPoints[index]
-        setSelectedPoint(point)
+      if (index >= 0 && index < samples.length) {
+        const sample = samples[index]
+        setSelectedPoint(sample)
       }
     }
   }
@@ -166,7 +205,7 @@ function PaceVisualization({ onClose }) {
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-        <Text style={styles.subtitle}>Tap on the graph to see what song was playing at each mile</Text>
+        <Text style={styles.subtitle}>Tap anywhere on the graph to see what song was playing at that distance</Text>
 
         {/* Chart */}
         <View style={styles.chartContainer}>
@@ -224,14 +263,15 @@ function PaceVisualization({ onClose }) {
               const chartAreaWidth = chartWidth - paddingLeft - 20
               const relativeX = locationX - paddingLeft
               
-              if (relativeX >= 0 && relativeX <= chartAreaWidth) {
-                // Calculate which mile was tapped (6 data points total)
-                const dataPointIndex = Math.round(
-                  (relativeX / chartAreaWidth) * (mockWorkoutData.dataPoints.length - 1)
-                )
-                const clampedIndex = Math.max(0, Math.min(dataPointIndex, mockWorkoutData.dataPoints.length - 1))
-                const point = mockWorkoutData.dataPoints[clampedIndex]
-                setSelectedPoint(point)
+              if (relativeX >= 0 && relativeX <= chartAreaWidth && samples.length > 0) {
+                // Calculate distance at tapped location based on total distance
+                const tappedDistance = (relativeX / chartAreaWidth) * totalDistance
+                
+                // Find the nearest sample to this distance
+                const nearestSample = findNearestSample(tappedDistance)
+                if (nearestSample) {
+                  setSelectedPoint(nearestSample)
+                }
               }
             }}
           />
@@ -248,19 +288,25 @@ function PaceVisualization({ onClose }) {
           <View style={styles.infoCard}>
             <View style={styles.infoHeader}>
               <MaterialIcons name="music-note" size={24} color="#5809C0" />
-              <Text style={styles.infoTitle}>Song at Mile {selectedPoint.distance}</Text>
+              <Text style={styles.infoTitle}>
+                Song at {selectedPoint.distance.toFixed(2)} {selectedPoint.distance === 1 ? 'mile' : 'miles'}
+              </Text>
             </View>
             <View style={styles.infoContent}>
-              <Text style={styles.songTitle}>{selectedPoint.song.title}</Text>
-              <Text style={styles.songArtist}>{selectedPoint.song.artist}</Text>
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Pace:</Text>
-                <Text style={styles.infoValue}>{secondsToPace(selectedPoint.pace)} min/mi</Text>
-              </View>
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>BPM:</Text>
-                <Text style={styles.infoValue}>{selectedPoint.song.bpm}</Text>
-              </View>
+              <Text style={styles.songTitle}>{selectedPoint.song?.title || 'Unknown'}</Text>
+              <Text style={styles.songArtist}>{selectedPoint.song?.artist || 'Unknown'}</Text>
+              {selectedPoint.pace > 0 && (
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>Pace:</Text>
+                  <Text style={styles.infoValue}>{secondsToPace(selectedPoint.pace)} min/mi</Text>
+                </View>
+              )}
+              {selectedPoint.song?.bpm > 0 && (
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>BPM:</Text>
+                  <Text style={styles.infoValue}>{selectedPoint.song.bpm}</Text>
+                </View>
+              )}
             </View>
           </View>
         )}
@@ -278,22 +324,32 @@ function PaceVisualization({ onClose }) {
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Total Distance:</Text>
             <Text style={styles.summaryValue}>
-              {mockWorkoutData.dataPoints.length} miles
+              {workoutData?.totalDistance ? `${workoutData.totalDistance.toFixed(2)} miles` : `${totalDistance.toFixed(2)} miles`}
             </Text>
           </View>
+          {workoutData?.totalTime && (
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Total Time:</Text>
+              <Text style={styles.summaryValue}>{workoutData.totalTime}</Text>
+            </View>
+          )}
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Songs Played:</Text>
             <Text style={styles.summaryValue}>
-              {new Set(mockWorkoutData.dataPoints.map(p => p.songId)).size}
+              {new Set(samples.map(s => s.song?.title).filter(Boolean)).size}
             </Text>
           </View>
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Avg Pace:</Text>
             <Text style={styles.summaryValue}>
-              {secondsToPace(
-                mockWorkoutData.dataPoints.reduce((sum, p) => sum + p.pace, 0) /
-                  mockWorkoutData.dataPoints.length
-              )}{' '}
+              {workoutData?.averagePace || (samples.length > 0 
+                ? (() => {
+                    const validPaces = samples.filter(s => s.pace > 0).map(s => s.pace)
+                    if (validPaces.length === 0) return '0:00'
+                    const avgPace = validPaces.reduce((sum, p) => sum + p, 0) / validPaces.length
+                    return secondsToPace(avgPace)
+                  })()
+                : '0:00')}{' '}
               min/mi
             </Text>
           </View>

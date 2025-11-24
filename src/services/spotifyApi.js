@@ -547,6 +547,11 @@ const getAvailableDevices = async () => {
     const data = await makeRequest('/me/player/devices');
     return data.devices || [];
   } catch (error) {
+    console.error('Error fetching available devices:', error);
+    // Don't silently fail - throw the error so we can see what's wrong
+    if (error.message.includes('No valid access token') || error.message.includes('Authentication failed')) {
+      throw error; // Re-throw auth errors
+    }
     return [];
   }
 };
