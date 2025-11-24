@@ -299,6 +299,7 @@ function Playlist({ distance, intensity, onBackToHome }) {
         onStop={handleStop}
         onPause={() => {}}
         onSkip={handleSkip}
+        onBack={() => setShowRunningPage(false)}
       />
     )
   }
@@ -389,6 +390,20 @@ function Playlist({ distance, intensity, onBackToHome }) {
 
   return (
     <View style={styles.playlistPage}>
+      {/* Back Button */}
+      <View style={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 10 }}>
+        <Pressable 
+          onPress={() => {
+            if (onBackToHome) {
+              onBackToHome()
+            }
+          }}
+          style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start' }}
+        >
+          <MaterialIcons name="arrow-back" size={24} color="#000000" />
+          <Text style={{ marginLeft: 8, fontSize: 16, color: '#000000' }}>Back</Text>
+        </Pressable>
+      </View>
       <ScrollView style={styles.scrollView}>
         {/* Playlist Header */}
       <View style={styles.playlistHeader}>

@@ -304,7 +304,7 @@ const useLocation = (isWorkoutPaused) => {
 }
 
 
-function RunningPage({ playlistTitle, currentSong, currentSongIndex = 0, allSongs = [], onStop, onPause, onSkip }) {
+function RunningPage({ playlistTitle, currentSong, currentSongIndex = 0, allSongs = [], onStop, onPause, onSkip, onBack }) {
   const [isWorkoutPaused, setIsWorkoutPaused] = useState(false)
   const [isSongPaused, setIsSongPaused] = useState(false)
   const [albumImageUrl, setAlbumImageUrl] = useState(null)
@@ -448,7 +448,17 @@ function RunningPage({ playlistTitle, currentSong, currentSongIndex = 0, allSong
     <View style={styles.container}>
       {/* Top Section: Playlist Title, Current Song, Metrics, Controls */}
       <View style={styles.topSection}>
-        <Text style={styles.playlistTitle}>{playlistTitle}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+          <Text style={styles.playlistTitle}>{playlistTitle}</Text>
+          {onBack && (
+            <Pressable 
+              onPress={onBack}
+              style={{ padding: 8 }}
+            >
+              <MaterialIcons name="close" size={28} color="#000000" />
+            </Pressable>
+          )}
+        </View>
         
         <View style={styles.currentSongSection}>
           <View style={[styles.albumArtSmall, { backgroundColor: albumArtColor, overflow: 'hidden' }]}>
