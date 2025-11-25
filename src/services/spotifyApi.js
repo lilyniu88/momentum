@@ -558,14 +558,19 @@ const getAvailableDevices = async () => {
  * @param {string} playlistId - Spotify playlist ID
  * @param {number} limit - Maximum number of tracks to fetch (default: 50, max: 100)
  * @param {number} offset - Offset for pagination (default: 0)
+ * @param {string} market - Optional. ISO 3166-1 alpha-2 country code
  * @returns {Promise<Array>} - Array of track objects (empty array if playlist not found or inaccessible)
  */
-const getPlaylistTracks = async (playlistId, limit = 50, offset = 0) => {
+const getPlaylistTracks = async (playlistId, limit = 50, offset = 0, market = null) => {
   try {
     const params = new URLSearchParams({
       limit: Math.min(limit, 100).toString(),
       offset: offset.toString(),
     });
+    
+    if (market) {
+      params.append('market', market);
+    }
     
     const data = await makeRequest(`/playlists/${playlistId}/tracks?${params.toString()}`);
     
@@ -588,6 +593,136 @@ const getPlaylistTracks = async (playlistId, limit = 50, offset = 0) => {
   }
 };
 
+/**
+ * Get tracks from a Spotify playlist or album
+ * Tries to fetch as a playlist first, then falls back to album if playlist is not found (404)
+ * 
+ * @param {string} id - Spotify playlist or album ID
+ * @param {number} limit - Maximum number of tracks to fetch (default: 50, max: 100) - only used for playlists
+ * @param {number} offset - Offset for pagination (default: 0) - only used for playlists
+ * @param {string} market - Optional. ISO 3166-1 alpha-2 country code
+ * @returns {Promise<Array>} - Array of track objects (empty array if not found or inaccessible)
+ */
+const getPlaylistOrAlbumTracks = async (id, limit = 50, offset = 0, market = null) => {
+  // Try playlist first
+  let playlistError = null;
+  try {
+    const params = new URLSearchParams({
+      limit: Math.min(limit, 100).toString(),
+      offset: offset.toString(),
+    });
+    
+    if (market) {
+      params.append('market', market);
+    }
+    
+    const data = await makeRequest(`/playlists/${id}/tracks?${params.toString()}`);
+    
+    // Extract track objects from the items array
+    const tracks = (data.items || [])
+      .map(item => item.track)
+      .filter(track => track !== null && track !== undefined);
+    
+    if (tracks && tracks.length > 0) {
+      return tracks;
+    }
+  } catch (error) {
+    playlistError = error;
+    // If it's a 404, try as album
+    if (error.message && (error.message.includes('404') || error.message.includes('not found') || error.message.includes('Resource not found'))) {
+      console.log(`ID ${id} not found as playlist (404), trying as album...`);
+      try {
+        const albumTracks = await getAlbumTracks(id, market);
+        if (albumTracks && albumTracks.length > 0) {
+          console.log(`✓ Successfully fetched ${albumTracks.length} tracks from album ${id}`);
+          return albumTracks;
+        }
+      } catch (albumError) {
+        console.warn(`ID ${id} not found as album either:`, albumError.message);
+        return [];
+      }
+    }
+  }
+  
+  // If playlist returned empty (but no error), try album as fallback
+  if (!playlistError) {
+    console.log(`Playlist ${id} returned no tracks, trying as album...`);
+    try {
+      const albumTracks = await getAlbumTracks(id, market);
+      if (albumTracks && albumTracks.length > 0) {
+        console.log(`✓ Successfully fetched ${albumTracks.length} tracks from album ${id}`);
+        return albumTracks;
+      }
+    } catch (albumError) {
+      console.warn(`ID ${id} not found as album:`, albumError.message);
+    }
+  } else if (!playlistError.message?.includes('404')) {
+    // If it's a non-404 error, log it
+    console.warn(`Error fetching playlist ${id}:`, playlistError.message);
+  }
+  
+  return [];
+};
+
+/**
+ * Get tracks from a Spotify album
+ * Reference: https://developer.spotify.com/documentation/web-api/reference/get-an-album
+ * 
+ * @param {string} albumId - Spotify album ID
+ * @param {string} market - Optional. ISO 3166-1 alpha-2 country code
+ * @returns {Promise<Array>} - Array of track objects enriched with album info (empty array if album not found or inaccessible)
+ */
+const getAlbumTracks = async (albumId, market = null) => {
+  try {
+    const params = new URLSearchParams();
+    if (market) {
+      params.append('market', market);
+    }
+    
+    const endpoint = `/albums/${albumId}${params.toString() ? `?${params.toString()}` : ''}`;
+    const album = await makeRequest(endpoint);
+    
+    // Album object has a tracks property with items array
+    // The tracks.items array contains SimplifiedTrackObject items
+    const simplifiedTracks = (album.tracks?.items || [])
+      .filter(track => track !== null && track !== undefined);
+    
+    // Enrich tracks with album information since SimplifiedTrackObject doesn't include album, uri, external_urls
+    const enrichedTracks = simplifiedTracks.map(track => ({
+      ...track,
+      album: {
+        id: album.id,
+        name: album.name,
+        images: album.images,
+        external_urls: album.external_urls,
+        uri: album.uri,
+      },
+      uri: track.uri || `spotify:track:${track.id}`,
+      external_urls: track.external_urls || {
+        spotify: `https://open.spotify.com/track/${track.id}`
+      },
+    }));
+    
+    // If there are more tracks (pagination), log it
+    if (album.tracks?.next) {
+      // Note: The album endpoint typically returns all tracks in the tracks.items array
+      // If pagination is needed for very large albums, you would need to fetch from album.tracks.next URL
+      console.log(`Album ${albumId} has ${album.tracks.total} total tracks, returning ${enrichedTracks.length} tracks`);
+    }
+    
+    return enrichedTracks;
+  } catch (error) {
+    // If album is not found (404) or inaccessible, return empty array instead of throwing
+    if (error.message && (error.message.includes('404') || error.message.includes('not found') || error.message.includes('Resource not found'))) {
+      console.warn(`Album ${albumId} not found or not accessible. Skipping album fetch.`);
+      return [];
+    }
+    console.error(`Error fetching album ${albumId}:`, error);
+    // For other errors, still return empty array to prevent breaking the app
+    return [];
+  }
+};
+
 export {
   getTopTracks,
   getAudioFeatures,
@@ -603,5 +738,7 @@ export {
   getAvailableDevices,
   transferPlayback,
   getPlaylistTracks,
+  getAlbumTracks,
+  getPlaylistOrAlbumTracks,
 };
 

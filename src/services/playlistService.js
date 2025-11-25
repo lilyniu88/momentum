@@ -5,7 +5,7 @@
  */
 
 import { batchGetBpmsFromDatabase } from './databaseService';
-import { getPlaylistTracks } from './spotifyApi';
+import { getPlaylistOrAlbumTracks } from './spotifyApi';
 
 // Helper function to convert time string (e.g., "2:14") to seconds
 const timeToSeconds = (timeString) => {
@@ -22,10 +22,9 @@ const secondsToMinutes = (seconds) => {
  * Spotify playlist IDs for different BPM ranges
  */
 const SPOTIFY_PLAYLISTS = {
-  130: '37i9dQZF1EIdJGESPytB8N',  // 130 BPM Mix
-  160: '37i9dQZF1EIdYV92VKrjuC',  // 160 BPM Mix
-  180: '37i9dQZF1EIgUYhklBpeMG',  // 180 BPM Workout Mix
-  190: '37i9dQZF1EIcID9rq1OAoH',  // 190 BPM Mix
+  130: '0rk91AJ5eLcenUKbAlCmTP',  // 130 BPM Mix
+  170: '5mn8yt78HIXg161cccC29T',  // 170 BPM Mix
+  180: '3DpH0nPzLIKjxA35dRXzBp',  // 180 BPM Mix
 };
 
 /**
@@ -37,7 +36,7 @@ const getPlaylistIdForIntensity = (intensity) => {
   // Map intensity to target BPM and corresponding playlist
   const mapping = {
     low: SPOTIFY_PLAYLISTS[130],      // Use 130 BPM playlist for low
-    medium: SPOTIFY_PLAYLISTS[160],  // Use 160 BPM playlist for medium
+    medium: SPOTIFY_PLAYLISTS[170],  // Use 170 BPM playlist for medium
     high: SPOTIFY_PLAYLISTS[180],     // Use 180 BPM playlist for high (default)
   };
   return mapping[intensity] || null;
@@ -51,8 +50,8 @@ const getPlaylistIdForIntensity = (intensity) => {
 export const getBPMRange = (intensity) => {
   const ranges = {
     low: { min: 120, max: 140 },
-    medium: { min: 140, max: 160 },
-    high: { min: 160, max: Infinity }
+    medium: { min: 140, max: 180 },  // Updated to include 170 BPM
+    high: { min: 180, max: Infinity }
   }
   return ranges[intensity] || { min: 0, max: Infinity }
 }
@@ -320,11 +319,11 @@ export const fetchAndFilterPlaylist = async (tracks, distance, intensity) => {
     const playlistId = getPlaylistIdForIntensity(intensity);
     if (playlistId) {
       try {
-        console.log(`Not enough songs (${filteredSongs.length}), fetching from Spotify playlist ${playlistId}...`);
-        const playlistTracks = await getPlaylistTracks(playlistId, 100);
+        console.log(`Not enough songs (${filteredSongs.length}), fetching from Spotify playlist/album ${playlistId}...`);
+        const playlistTracks = await getPlaylistOrAlbumTracks(playlistId, 100);
         
         if (!playlistTracks || playlistTracks.length === 0) {
-          console.warn(`No tracks found from playlist ${playlistId}. Playlist may be private or inaccessible.`);
+          console.warn(`No tracks found from playlist/album ${playlistId}. May be private or inaccessible.`);
         } else if (playlistTracks && playlistTracks.length > 0) {
           // Map playlist tracks to our format
           const playlistTracksWithInfo = playlistTracks
@@ -370,10 +369,10 @@ export const fetchAndFilterPlaylist = async (tracks, distance, intensity) => {
           const mappedPlaylistTracks = playlistTracksWithInfo.map((track) => {
             const key = `${track.title.toLowerCase()}|${track.artist.toLowerCase()}`;
             // For playlist tracks, use the target BPM based on playlist
-            // 130 BPM playlist -> 130, 160 BPM playlist -> 160, etc.
+            // 130 BPM playlist -> 130, 170 BPM playlist -> 170, etc.
             let targetBpm = null;
             if (playlistId === SPOTIFY_PLAYLISTS[130]) targetBpm = 130;
-            else if (playlistId === SPOTIFY_PLAYLISTS[160]) targetBpm = 160;
+            else if (playlistId === SPOTIFY_PLAYLISTS[170]) targetBpm = 170;
             else if (playlistId === SPOTIFY_PLAYLISTS[180]) targetBpm = 180;
             else if (playlistId === SPOTIFY_PLAYLISTS[190]) targetBpm = 190;
             
