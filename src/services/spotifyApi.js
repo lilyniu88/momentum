@@ -551,6 +551,43 @@ const getAvailableDevices = async () => {
   }
 };
 
+/**
+ * Get tracks from a Spotify playlist
+ * Reference: https://developer.spotify.com/documentation/web-api/reference/get-playlists-tracks
+ * 
+ * @param {string} playlistId - Spotify playlist ID
+ * @param {number} limit - Maximum number of tracks to fetch (default: 50, max: 100)
+ * @param {number} offset - Offset for pagination (default: 0)
+ * @returns {Promise<Array>} - Array of track objects (empty array if playlist not found or inaccessible)
+ */
+const getPlaylistTracks = async (playlistId, limit = 50, offset = 0) => {
+  try {
+    const params = new URLSearchParams({
+      limit: Math.min(limit, 100).toString(),
+      offset: offset.toString(),
+    });
+    
+    const data = await makeRequest(`/playlists/${playlistId}/tracks?${params.toString()}`);
+    
+    // Extract track objects from the items array
+    // Each item has a track property (or null if track is unavailable)
+    const tracks = (data.items || [])
+      .map(item => item.track)
+      .filter(track => track !== null && track !== undefined);
+    
+    return tracks;
+  } catch (error) {
+    // If playlist is not found (404) or inaccessible, return empty array instead of throwing
+    if (error.message && (error.message.includes('404') || error.message.includes('not found') || error.message.includes('Resource not found'))) {
+      console.warn(`Playlist ${playlistId} not found or not accessible. Skipping playlist fetch.`);
+      return [];
+    }
+    console.error(`Error fetching playlist ${playlistId}:`, error);
+    // For other errors, still return empty array to prevent breaking the app
+    return [];
+  }
+};
+
 export {
   getTopTracks,
   getAudioFeatures,
@@ -565,5 +602,6 @@ export {
   skipToPrevious,
   getAvailableDevices,
   transferPlayback,
+  getPlaylistTracks,
 };
 

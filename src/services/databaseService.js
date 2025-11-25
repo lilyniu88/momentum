@@ -59,7 +59,8 @@ export const getBpmFromDatabase = async (title, artist) => {
     );
 
     if (exactMatch) {
-      return parseFloat(exactMatch.bpm);
+      const bpm = parseFloat(exactMatch.bpm);
+      return bpm !== null && !isNaN(bpm) ? Math.round(bpm) : null;
     }
 
     // Try partial match on title and artist (in case of slight variations)
@@ -74,7 +75,8 @@ export const getBpmFromDatabase = async (title, artist) => {
     });
 
     if (partialMatch) {
-      return parseFloat(partialMatch.bpm);
+      const bpm = parseFloat(partialMatch.bpm);
+      return bpm !== null && !isNaN(bpm) ? Math.round(bpm) : null;
     }
 
     return null;
