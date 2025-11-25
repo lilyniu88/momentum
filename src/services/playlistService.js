@@ -5,6 +5,7 @@
  */
 
 import { batchFetchBpms } from './getsongBpmApi';
+import { batchGetBpmsFromDatabase } from './databaseService';
 
 // Helper function to convert time string (e.g., "2:14") to seconds
 const timeToSeconds = (timeString) => {
@@ -27,9 +28,9 @@ export const getBPMRange = (intensity) => {
     // low: { min: 120, max: 140 },
     // medium: { min: 140, max: 160 },
     // high: { min: 160, max: Infinity }
-    low: { min: 0, max: 120 },      // Under 120 BPM
-    medium: { min: 120, max: 120 },  // Exactly 120 BPM
-    high: { min: 121, max: Infinity } // Over 120 BPM
+    low: { min: 0, max: 119 },
+    medium: { min: 120, max: 160 },
+    high: { min: 160, max: Infinity }
   }
   return ranges[intensity] || { min: 0, max: Infinity }
 }
@@ -232,16 +233,65 @@ export const fetchAndFilterPlaylist = async (tracks, distance, intensity) => {
     artist: track.artist,
   }));
 
-  // Fetch BPMs from GetSong API
+  // First, try to get BPMs from local database
   let songsWithBpm = [];
+  let songsNeedingApi = [];
+  
   try {
-    console.log(`Fetching BPMs for ${songsForBpmLookup.length} songs from GetSong API...`);
-    songsWithBpm = await batchFetchBpms(songsForBpmLookup);
-    console.log(`Retrieved BPM data for ${songsWithBpm.filter(s => s.bpm !== null).length}/${songsWithBpm.length} songs`);
+    console.log(`Querying database for BPMs of ${songsForBpmLookup.length} songs...`);
+    songsWithBpm = await batchGetBpmsFromDatabase(songsForBpmLookup);
+    
+    // Identify songs that don't have BPM data in database
+    songsNeedingApi = songsWithBpm
+      .filter(song => song.bpm === null || song.bpm === undefined)
+      .map(song => ({
+        title: song.title,
+        artist: song.artist,
+      }));
+    
+    const foundInDb = songsWithBpm.filter(s => s.bpm !== null && s.bpm !== undefined).length;
+    console.log(`Found BPM data in database for ${foundInDb}/${songsForBpmLookup.length} songs`);
+    
+    if (songsNeedingApi.length > 0) {
+      console.log(`Querying GetSong API for ${songsNeedingApi.length} songs not found in database...`);
+    }
   } catch (error) {
-    console.warn('Failed to fetch BPMs from GetSong API, continuing without BPM data:', error.message);
-    songsWithBpm = songsForBpmLookup.map(song => ({ ...song, bpm: null }));
+    console.warn('Error querying database, falling back to API:', error.message);
+    songsNeedingApi = songsForBpmLookup;
+    songsWithBpm = [];
   }
+
+  // For songs not found in database, fetch from GetSong API
+  if (songsNeedingApi.length > 0) {
+    try {
+      const apiResults = await batchFetchBpms(songsNeedingApi);
+      
+      // Merge API results with database results
+      const apiBpmMap = {};
+      apiResults.forEach(song => {
+        const key = `${song.title.toLowerCase()}|${song.artist.toLowerCase()}`;
+        apiBpmMap[key] = song.bpm;
+      });
+      
+      // Update songsWithBpm with API results
+      songsWithBpm = songsWithBpm.map(song => {
+        const key = `${song.title.toLowerCase()}|${song.artist.toLowerCase()}`;
+        if ((song.bpm === null || song.bpm === undefined) && apiBpmMap[key] !== undefined) {
+          return { ...song, bpm: apiBpmMap[key] };
+        }
+        return song;
+      });
+      
+      const foundInApi = apiResults.filter(s => s.bpm !== null).length;
+      console.log(`Retrieved BPM data from API for ${foundInApi}/${apiResults.length} songs`);
+    } catch (error) {
+      console.warn('Failed to fetch BPMs from GetSong API:', error.message);
+      // Keep database results, API results will remain null
+    }
+  }
+  
+  const totalWithBpm = songsWithBpm.filter(s => s.bpm !== null && s.bpm !== undefined).length;
+  console.log(`Total BPM data available: ${totalWithBpm}/${songsWithBpm.length} songs`);
 
   // Create a map of title+artist to BPM
   const bpmMap = {};
