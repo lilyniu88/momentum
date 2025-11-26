@@ -6,6 +6,7 @@ import {
   ScrollView,
   Modal,
 } from 'react-native'
+import { FontAwesome5 } from '@expo/vector-icons'
 import Playlist from './Playlist'
 import { quickRunStyles as styles } from './styles'
 
@@ -41,8 +42,15 @@ function QuickRun() {
     return option ? option.label : options[0].label
   }
 
+  const handleBackToHome = () => {
+    setShowPlaylist(false)
+    // Reset filters when coming back
+    setDistance('')
+    setIntensity('')
+  }
+
   if (showPlaylist) {
-    return <Playlist distance={distance} intensity={intensity} />
+    return <Playlist distance={distance} intensity={intensity} onBackToHome={handleBackToHome} />
   }
 
   const renderPickerModal = (options, selectedValue, onSelect, isVisible, onClose) => (
@@ -88,7 +96,11 @@ function QuickRun() {
         contentContainerStyle={styles.contentContainer}
       >
         <View style={styles.container}>
-          <Text style={styles.title}>Quick Run</Text>
+          <View style={styles.titleContainer}>
+            <FontAwesome5 name="running" size={32} color="#5809C0" style={styles.titleIcon} />
+            <Text style={styles.title}>Quick Run</Text>
+            <FontAwesome5 name="home" size={24} color="#5809C0" style={styles.homeIcon} />
+          </View>
           
           <View style={styles.filters}>
             <View style={styles.filterGroup}>

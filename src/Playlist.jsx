@@ -1,119 +1,186 @@
-import React, { useMemo, useState } from 'react'
+import React, { useMemo, useState, useEffect } from 'react'
 import {
   View,
   Text,
   ScrollView,
   Pressable,
   FlatList,
-  Platform,
+  Linking,
+  ActivityIndicator,
+  Image,
 } from 'react-native'
 import { MaterialIcons } from '@expo/vector-icons'
 import { playlistStyles as styles } from './styles'
-import { generatePlaylist } from './services/playlistService'
+import { generatePlaylist, fetchAndFilterPlaylist } from './services/playlistService'
 import RunningPage from './RunningPage'
+import PaceVisualization from './PaceVisualization'
+import {
+  useAuthRequest,
+  exchangeCodeForTokens,
+  saveTokens,
+  isAuthenticated,
+  getValidAccessToken,
+  clearTokens,
+  getRedirectUri,
+} from './services/spotifyAuth'
+import { fetchTopTracksWithFeatures, getAlbumCoverArt, getTopTracks, startPlayback, getAvailableDevices, transferPlayback } from './services/spotifyApi'
 
-// All available songs (in a real app, this would come from Spotify API)
-const allSongs = [
-    {
-      id: 1,
-      title: "360",
-      artist: "Charli XCX",
-      bpm: 181,
-      time: "2:14",
-      expectedPace: "6:14",
-      albumArt: "brat"
-    },
-    {
-      id: 2,
-      title: "HUMBLE.",
-      artist: "Kendrick Lamar",
-      bpm: 182,
-      time: "2:57",
-      expectedPace: "6:09",
-      albumArt: "damn"
-    },
-    {
-      id: 3,
-      title: "IS IT",
-      artist: "Tyla",
-      bpm: 189,
-      time: "2:44",
-      expectedPace: "6:08",
-      albumArt: "tyla"
-    },
-    {
-      id: 4,
-      title: "MY HOUSE",
-      artist: "Beyoncé",
-      bpm: 142,
-      time: "4:23",
-      expectedPace: "9:23",
-      albumArt: "beyonce"
-    },
-    {
-      id: 5,
-      title: "DNA.",
-      artist: "Kendrick Lamar",
-      bpm: 140,
-      time: "3:06",
-      expectedPace: "9:42",
-      albumArt: "damn"
-    },
-    {
-      id: 6,
-      title: "365",
-      artist: "Charli XCX",
-      bpm: 181,
-      time: "2:18",
-      expectedPace: "6:12",
-      albumArt: "brat"
-  },
-  {
-    id: 7,
-    title: "Party in the U.S.A.",
-    artist: "Miley Cyrus",
-    bpm: 100,
-    time: "3:22",
-    expectedPace: "10:00",
-    albumArt: "miley"
-  },
-  {
-    id: 8,
-    title: "Fireball",
-    artist: "Pitbull",
-    bpm: 128,
-    time: "3:24",
-    expectedPace: "8:00",
-    albumArt: "pitbull"
-  },
-  {
-    id: 9,
-    title: "Good as Hell",
-    artist: "Lizzo",
-    bpm: 120,
-    time: "2:39",
-    expectedPace: "8:30",
-    albumArt: "lizzo"
-  },
-  {
-    id: 10,
-    title: "Levitating",
-    artist: "Dua Lipa",
-    bpm: 103,
-    time: "3:23",
-    expectedPace: "9:45",
-    albumArt: "dua"
-  }
-]
-
-function Playlist({ distance, intensity }) {
+function Playlist({ distance, intensity, onBackToHome }) {
   const [showRunningPage, setShowRunningPage] = useState(false)
+  const [showVisualization, setShowVisualization] = useState(false)
   const [currentSongIndex, setCurrentSongIndex] = useState(0)
+  const [workoutData, setWorkoutData] = useState(null)
+  const [authReady, setAuthReady] = useState(false)
+  const [spotifySongs, setSpotifySongs] = useState([])
+  const [isLoadingSpotify, setIsLoadingSpotify] = useState(false)
+  const [authError, setAuthError] = useState(null)
+  const [albumArtUrls, setAlbumArtUrls] = useState({})
+  const [hasActiveDevice, setHasActiveDevice] = useState(null) // null = unknown, true/false = checked
 
-  // Generate filtered playlist based on distance and intensity preferences
+  const [request, response, promptAsync] = useAuthRequest()
+
+  // Check authentication on mount
+  useEffect(() => {
+    checkAuthAndFetchTracks()
+  }, [])
+
+  useEffect(() => {
+    if (response?.type === 'success') {
+      handleAuthSuccess(response.params.code, request?.codeVerifier)
+    } else if (response?.type === 'error') {
+      console.error('OAuth error:', response.error)
+      const errorMsg = response.error?.message || response.error?.error || 'Unknown error'
+      setAuthError(`Authentication failed: ${errorMsg}`)
+      
+      // If it's an invalid redirect URI error, provide helpful message
+      if (errorMsg.includes('redirect_uri') || errorMsg.includes('redirect')) {
+        setAuthError(`Invalid redirect URI. Check console for the exact URI and add it to Spotify Dashboard. Error: ${errorMsg}`)
+      }
+      
+      setIsLoadingSpotify(false)
+    }
+  }, [response, request])
+
+  // Check if user is authenticated and fetch tracks
+  const checkAuthAndFetchTracks = async () => {
+    try {
+      const authenticated = await isAuthenticated()
+      if (authenticated) {
+        setAuthReady(true)
+        await fetchSpotifyTracks()
+      } else {
+        setAuthReady(false)
+      }
+    } catch (error) {
+      console.error('Error checking authentication:', error)
+      setAuthReady(false)
+    }
+  }
+
+  // Handle successful authentication
+  const handleAuthSuccess = async (code, codeVerifier) => {
+    try {
+      setIsLoadingSpotify(true)
+      setAuthError(null)
+      
+      const redirectUri = request?.redirectUri || getRedirectUri()
+      const tokens = await exchangeCodeForTokens(code, codeVerifier, redirectUri)
+      await saveTokens(tokens.accessToken, tokens.refreshToken, tokens.expiresIn)
+      
+      setAuthReady(true)
+      await fetchSpotifyTracks()
+    } catch (error) {
+      console.error('Error during authentication:', error)
+      setAuthError(`Failed to authenticate: ${error.message}`)
+      setIsLoadingSpotify(false)
+    }
+  }
+
+  // Check for available devices
+  const checkDevices = async () => {
+    try {
+      const devices = await getAvailableDevices()
+      const activeDevice = devices.find(device => device.is_active)
+      const hasDevice = activeDevice !== undefined
+      setHasActiveDevice(hasDevice)
+      return hasDevice
+    } catch (error) {
+      setHasActiveDevice(false)
+      return false
+    }
+  }
+
+  // Fetch top tracks from Spotify
+  const fetchSpotifyTracks = async () => {
+    try {
+      setIsLoadingSpotify(true)
+      setAuthError(null)
+      
+      // Get raw tracks from Spotify (without BPM data)
+      const rawTracks = await getTopTracks({
+        time_range: 'short_term',
+        limit: 50,
+      })
+      
+      console.log(`Retrieved ${rawTracks?.length || 0} tracks from Spotify`)
+      
+      // Fetch BPMs and filter by distance/intensity in playlistService
+      const filteredTracks = await fetchAndFilterPlaylist(
+        rawTracks || [],
+        distance,
+        intensity
+      )
+      
+      console.log(`Loaded ${filteredTracks?.length || 0} filtered tracks`)
+      setSpotifySongs(filteredTracks || [])
+      setIsLoadingSpotify(false)
+      
+      // Check for devices after tracks are loaded (for UI display only)
+      await checkDevices()
+    } catch (error) {
+      console.error('Error fetching Spotify tracks:', error)
+      setAuthError(`Failed to fetch tracks: ${error.message}`)
+      setIsLoadingSpotify(false)
+      
+      if (error.message.includes('Authentication failed')) {
+        await clearTokens()
+        setAuthReady(false)
+      }
+    }
+  }
+
+  // Handle Spotify connect button
+  const handleConnectSpotify = async () => {
+    try {
+      setIsLoadingSpotify(true)
+      setAuthError(null)
+      
+      if (!request) {
+        setAuthError('OAuth request not ready. Please check your CLIENT_ID in .env file.')
+        setIsLoadingSpotify(false)
+        return
+      }
+      
+      await promptAsync()
+    } catch (error) {
+      console.error('Error prompting auth:', error)
+      setAuthError(`Failed to start authentication: ${error.message}`)
+      setIsLoadingSpotify(false)
+    }
+  }
+
+
+  // Songs are already filtered by fetchAndFilterPlaylist
+  // But if distance/intensity props change, we need to re-filter
   const songs = useMemo(() => {
-    return generatePlaylist(allSongs, distance, intensity)
-  }, [distance, intensity])
+    // If no songs available, return empty array
+    if (spotifySongs.length === 0) {
+      return []
+    }
+    
+    // Re-filter if distance/intensity changed (tracks already have BPM data)
+    return generatePlaylist(spotifySongs, distance, intensity)
+  }, [spotifySongs, distance, intensity])
 
   const currentSong = songs[currentSongIndex] || songs[0]
 
@@ -134,17 +201,91 @@ function Playlist({ distance, intensity }) {
     return `${intensityLabel} ${distanceLabel} MIX`
   }
 
-  const handlePlay = () => {
+  const handlePlay = async () => {
+    if (songs.length > 0 && songs[0]?.spotifyUri) {
+      try {
+        // Always check for available devices when play is clicked
+        const devices = await getAvailableDevices()
+        
+        if (devices.length === 0) {
+          setAuthError('No devices available. Please open Spotify on your phone, computer, or web player, then try again.')
+          setHasActiveDevice(false)
+          return
+        }
+        
+        // Find active device or use first available device
+        let targetDevice = devices.find(device => device.is_active)
+        
+        // If no active device, transfer playback to first available device
+        if (!targetDevice) {
+          targetDevice = devices[0]
+          try {
+            await transferPlayback(targetDevice.id, false)
+          } catch (transferError) {
+            // If transfer fails, still try to start playback - Spotify might handle it
+          }
+        }
+        
+        // Reset to first song when starting playback
+        setCurrentSongIndex(0)
+        
+        // Start playback from the first song (index 0)
+        const allUris = songs.map(song => song.spotifyUri).filter(Boolean)
+        await startPlayback({
+          uris: allUris,
+          offset: { position: 0 },
+          positionMs: 0,
+          deviceId: targetDevice.id,
+        })
+        
+        setHasActiveDevice(true)
+        setAuthError(null)
+      } catch (error) {
+        const isNonCriticalError = error.message.includes('non-critical') || 
+                                  error.message.includes('devices');
+        const isPlaybackError = error.message.includes('Missing permissions') && 
+                                !isNonCriticalError;
+        
+        if (error.message.includes('No valid access token') || error.message.includes('Authentication required') || error.code === 'AUTH_REQUIRED') {
+          setAuthError('Authentication required. Please disconnect and reconnect Spotify.')
+          return
+        }
+        if (isPlaybackError || (error.message.includes('Missing permissions') && error.message.includes('playback'))) {
+          setAuthError('Missing permissions: Please disconnect and reconnect Spotify to enable playback.')
+          return
+        }
+        if (error.message.includes('No active device') || error.reason === 'NO_ACTIVE_DEVICE' || error.code === 'NO_ACTIVE_DEVICE') {
+          setAuthError('No active device found. Please open Spotify on your phone, computer, or web player, then try again.')
+          setHasActiveDevice(false)
+          return
+        }
+      }
+    }
     setShowRunningPage(true)
   }
 
-  const handleStop = () => {
+  const handleStop = (data) => {
     setShowRunningPage(false)
+    setWorkoutData(data) // Store workout data with samples
+    setShowVisualization(true)
     setCurrentSongIndex(0)
+  }
+
+  const handleCloseVisualization = () => {
+    setShowVisualization(false)
+    // Go back to home screen (QuickRun)
+    if (onBackToHome) {
+      onBackToHome()
+    }
   }
 
   const handleSkip = () => {
     setCurrentSongIndex((prev) => (prev + 1) % songs.length)
+  }
+
+  // Show visualization if run was stopped
+  if (showVisualization) {
+    return <PaceVisualization onClose={handleCloseVisualization} workoutData={workoutData} />
   }
 
   // Show running page if play button was clicked
@@ -153,57 +294,75 @@ function Playlist({ distance, intensity }) {
       <RunningPage
         playlistTitle={getPlaylistTitle()}
         currentSong={currentSong}
+        currentSongIndex={currentSongIndex}
+        allSongs={songs}
         onStop={handleStop}
         onPause={() => {}}
         onSkip={handleSkip}
+        onBack={() => setShowRunningPage(false)}
       />
     )
   }
 
-  const getAlbumArtText = (albumArt) => {
-    const map = {
-      'brat': 'brat',
-      'damn': 'DAMN.',
-      'tyla': 'T',
-      'beyonce': 'B',
-      'miley': 'M',
-      'pitbull': 'P',
-      'lizzo': 'L',
-      'dua': 'D'
+  const getAlbumArtText = (albumArt, title) => {
+    // If albumArt is a URL (from Spotify), use first letter of title
+    if (typeof albumArt === 'string' && albumArt.startsWith('http')) {
+      return title?.charAt(0)?.toUpperCase() || '♪'
     }
-    return map[albumArt] || 'A'
+    // Otherwise use first letter of title
+    return title?.charAt(0)?.toUpperCase() || 'A'
   }
 
   const getAlbumArtColor = (albumArt) => {
-    const map = {
-      'brat': '#22c55e',
-      'damn': '#e5e7eb',
-      'tyla': '#fbbf24',
-      'beyonce': '#1a1a1a',
-      'miley': '#fef3c7',
-      'pitbull': '#5809C0',
-      'lizzo': '#7BF0FF',
-      'dua': '#D3C2F7'
-    }
-    return map[albumArt] || '#EFEFEF'
+    // Use default color for all tracks (Spotify tracks will have URLs)
+    return '#EFEFEF'
   }
 
-  const getAlbumArtTextColor = (albumArt) => {
-    const darkBackgrounds = ['damn', 'beyonce', 'pitbull']
-    return darkBackgrounds.includes(albumArt) ? '#FFFFFF' : '#000000'
+  // Open track in Spotify
+  const openTrackInSpotify = async (song) => {
+    if (song.spotifyUri) {
+      const spotifyUri = song.spotifyUri
+      const canOpen = await Linking.canOpenURL(spotifyUri)
+      
+      if (canOpen) {
+        await Linking.openURL(spotifyUri)
+      } else if (song.spotifyUrl) {
+        // Fallback to web URL
+        await Linking.openURL(song.spotifyUrl)
+      }
+    } else if (song.spotifyUrl) {
+      await Linking.openURL(song.spotifyUrl)
+    }
   }
 
   const renderTrack = ({ item: song }) => {
+    // Get album image URL - prefer albumImageUrl from track, then fetched URL, then fallback
+    const albumImageUrl = song.albumImageUrl || (song.albumId ? albumArtUrls[song.albumId] : null)
     const albumArtColor = getAlbumArtColor(song.albumArt)
-    const albumArtTextColor = getAlbumArtTextColor(song.albumArt)
+    const albumArtText = getAlbumArtText(song.albumArt, song.title)
 
     return (
-      <View style={styles.trackRow}>
+      <Pressable 
+        style={styles.trackRow}
+        onPress={() => {
+          if (song.spotifyUri || song.spotifyUrl) {
+            openTrackInSpotify(song)
+          }
+        }}
+      >
         <View style={styles.trackTitleCol}>
           <View style={[styles.trackThumbnail, { backgroundColor: albumArtColor }]}>
-            <Text style={[styles.thumbnailText, { color: albumArtTextColor }]}>
-              {getAlbumArtText(song.albumArt)}
-            </Text>
+            {albumImageUrl ? (
+              <Image 
+                source={{ uri: albumImageUrl }} 
+                style={{ width: '100%', height: '100%', borderRadius: 4 }}
+                resizeMode="cover"
+              />
+            ) : (
+              <Text style={[styles.thumbnailText, { color: '#000000' }]}>
+                {albumArtText}
+              </Text>
+            )}
           </View>
           <View style={styles.trackInfo}>
             <Text style={styles.trackName}>{song.title}</Text>
@@ -213,7 +372,7 @@ function Playlist({ distance, intensity }) {
         <Text style={styles.trackBpmCol}>{song.bpm}</Text>
         <Text style={styles.trackTimeCol}>{song.time}</Text>
         <Text style={styles.trackPaceCol}>{song.expectedPace} min/mi</Text>
-      </View>
+      </Pressable>
     )
   }
 
@@ -231,24 +390,51 @@ function Playlist({ distance, intensity }) {
 
   return (
     <View style={styles.playlistPage}>
+      {/* Back Button */}
+      <View style={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 10 }}>
+        <Pressable 
+          onPress={() => {
+            if (onBackToHome) {
+              onBackToHome()
+            }
+          }}
+          style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start' }}
+        >
+          <MaterialIcons name="arrow-back" size={24} color="#000000" />
+          <Text style={{ marginLeft: 8, fontSize: 16, color: '#000000' }}>Back</Text>
+        </Pressable>
+      </View>
       <ScrollView style={styles.scrollView}>
         {/* Playlist Header */}
       <View style={styles.playlistHeader}>
         <View style={styles.playlistInfoSection}>
           <View>
-            <View style={styles.albumArtGrid}>
-              <View style={[styles.albumArt, { backgroundColor: '#22c55e' }]}>
-                <Text style={styles.albumArtText}>brat</Text>
-              </View>
-              <View style={[styles.albumArt, { backgroundColor: '#e5e7eb' }]}>
-                <Text style={[styles.albumArtText, styles.albumArtTextDark]}>DAMN.</Text>
-              </View>
-              <View style={[styles.albumArt, { backgroundColor: '#1f2937' }]}>
-                <Text style={styles.albumArtText}>F</Text>
-              </View>
-              <View style={[styles.albumArt, { backgroundColor: '#fef3c7' }]}>
-                <Text style={[styles.albumArtText, styles.albumArtTextDark]}>L</Text>
-              </View>
+          <View style={styles.albumArtGrid}>
+              {/* Show first 4 tracks' album art or placeholder */}
+              {songs.slice(0, 4).map((song, index) => {
+                const albumImageUrl = song.albumImageUrl || (song.albumId ? albumArtUrls[song.albumId] : null)
+                return (
+                  <View key={song.id || index} style={[styles.albumArt, { backgroundColor: '#EFEFEF', overflow: 'hidden' }]}>
+                    {albumImageUrl ? (
+                      <Image 
+                        source={{ uri: albumImageUrl }} 
+                        style={{ width: '100%', height: '100%' }}
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <Text style={[styles.albumArtText, { color: '#000000' }]}>
+                        {song.title?.charAt(0)?.toUpperCase() || '♪'}
+                      </Text>
+                    )}
+            </View>
+                )
+              })}
+              {/* Fill remaining slots if less than 4 songs */}
+              {Array.from({ length: Math.max(0, 4 - songs.length) }).map((_, index) => (
+                <View key={`placeholder-${index}`} style={[styles.albumArt, { backgroundColor: '#EFEFEF' }]}>
+                  <Text style={[styles.albumArtText, { color: '#000000' }]}>♪</Text>
+            </View>
+              ))}
             </View>
             <Text style={styles.playlistSummary}>
               {songs.length} songs, {totalMinutes} min
@@ -266,23 +452,154 @@ function Playlist({ distance, intensity }) {
         </View>
       </View>
 
-        {/* Action Buttons */}
-        <View style={styles.playlistActionsRow}>
-          <View style={styles.actionButtonsRow}>
-            <Pressable style={styles.actionIconBtn}>
-              <MaterialIcons name="favorite-border" size={20} color="#5809C0" />
-            </Pressable>
-            <Pressable style={styles.actionIconBtn}>
-              <MaterialIcons name="download" size={20} color="#5809C0" />
-            </Pressable>
-            <Pressable style={styles.actionIconBtn}>
-              <MaterialIcons name="more-vert" size={20} color="#5809C0" />
-            </Pressable>
+        {/* Spotify Connect Button or Action Buttons */}
+        {!authReady ? (
+          <View style={styles.spotifyConnectSection}>
+            {authError && (
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorText}>{authError}</Text>
+                {(authError.includes('Missing permissions') || authError.includes('Permissions missing')) ? (
+                  <Text style={styles.redirectUriHint}>
+                    Please reconnect Spotify to grant playback permissions.
+                  </Text>
+                ) : null}
+                {request?.redirectUri && (
+                  <>
+                    <Text style={styles.redirectUriHint}>
+                      Redirect URI: {request.redirectUri}
+                    </Text>
+                    <Text style={styles.redirectUriHint}>
+                      Make sure this EXACT URI is added to your Spotify Dashboard
+                    </Text>
+                  </>
+                )}
+              </View>
+            )}
+            {isLoadingSpotify ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#5809C0" />
+                <Text style={styles.loadingText}>Connecting to Spotify...</Text>
+              </View>
+            ) : (
+              <>
+                <Pressable 
+                  style={styles.spotifyConnectButton} 
+                  onPress={handleConnectSpotify}
+                  disabled={!request}
+                >
+                  <MaterialIcons name="music-note" size={24} color="#FFFFFF" />
+                  <Text style={styles.spotifyConnectText}>Connect Spotify</Text>
+                </Pressable>
+                {request?.redirectUri && (
+                  <Text style={styles.redirectUriDisplay}>
+                    Redirect URI: {request.redirectUri}
+                  </Text>
+                )}
+              </>
+            )}
+            <Text style={styles.spotifyConnectHint}>
+              Connect to see your top tracks sorted by BPM
+            </Text>
           </View>
-          <Pressable style={styles.playButton} onPress={handlePlay}>
-            <MaterialIcons name="play-arrow" size={24} color="#FFFFFF" />
-          </Pressable>
+        ) : (
+                <View style={styles.playlistActionsRow}>
+                  <View style={styles.actionButtonsRow}>
+                    <Pressable style={styles.actionIconBtn}>
+                      <MaterialIcons name="favorite-border" size={20} color="#5809C0" />
+                    </Pressable>
+                    <Pressable style={styles.actionIconBtn}>
+                      <MaterialIcons name="download" size={20} color="#5809C0" />
+                    </Pressable>
+                    <Pressable 
+                      style={styles.actionIconBtn}
+                      onPress={async () => {
+                        console.log('Disconnecting Spotify...')
+                        await clearTokens()
+                        setAuthReady(false)
+                        setSpotifySongs([])
+                        setAuthError(null)
+                        setHasActiveDevice(null)
+                        console.log('Spotify disconnected. Please reconnect to grant permissions.')
+                      }}
+                    >
+                      <MaterialIcons name="logout" size={20} color="#5809C0" />
+                    </Pressable>
+                  </View>
+                  <Pressable style={styles.playButton} onPress={handlePlay}>
+                    <MaterialIcons name="play-arrow" size={24} color="#FFFFFF" />
+                  </Pressable>
+                </View>
+        )}
+
+        {/* Show error message even when authenticated */}
+        {authReady && authError && (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>{authError}</Text>
+                  {(authError.includes('Missing permissions') || authError.includes('Permissions missing')) ? (
+                    <>
+                      <Text style={styles.redirectUriHint}>
+                        Please disconnect and reconnect Spotify to grant playback permissions.
+                      </Text>
+                      <Pressable 
+                        style={[styles.spotifyConnectButton, { marginTop: 12, backgroundColor: '#5809C0' }]}
+                        onPress={async () => {
+                          console.log('Disconnecting Spotify...')
+                          await clearTokens()
+                          setAuthReady(false)
+                          setSpotifySongs([])
+                          setAuthError(null)
+                          setHasActiveDevice(null)
+                          console.log('Spotify disconnected. Please reconnect to grant permissions.')
+                        }}
+                      >
+                        <Text style={styles.spotifyConnectText}>Disconnect & Reconnect</Text>
+                      </Pressable>
+                    </>
+                  ) : (authError.includes('Authentication required') || authError.includes('No valid access token')) ? (
+                    <>
+                      <Text style={styles.redirectUriHint}>
+                        Please disconnect and reconnect Spotify.
+                      </Text>
+                      <Pressable 
+                        style={[styles.spotifyConnectButton, { marginTop: 12, backgroundColor: '#5809C0' }]}
+                        onPress={async () => {
+                          console.log('Disconnecting Spotify...')
+                          await clearTokens()
+                          setAuthReady(false)
+                          setSpotifySongs([])
+                          setAuthError(null)
+                          setHasActiveDevice(null)
+                          console.log('Spotify disconnected. Please reconnect to grant permissions.')
+                        }}
+                      >
+                        <Text style={styles.spotifyConnectText}>Disconnect & Reconnect</Text>
+                      </Pressable>
+                    </>
+                  ) : (authError.includes('No active device')) ? (
+                    <Text style={styles.redirectUriHint}>
+                      Open Spotify on your phone, computer, or web player, then try playing again.
+                    </Text>
+                  ) : null}
+            </View>
+        )}
+        
+        {/* Show device status warning */}
+        {authReady && !isLoadingSpotify && hasActiveDevice === false && !authError && (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>No active Spotify device found</Text>
+            <Text style={styles.redirectUriHint}>
+              Open Spotify on your phone, computer, or web player to enable playback.
+            </Text>
+          </View>
+        )}
+
+        {/* Loading indicator for Spotify tracks */}
+        {authReady && isLoadingSpotify && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#5809C0" />
+            <Text style={styles.loadingText}>Loading your top tracks...</Text>
         </View>
+        )}
 
         {/* Song List */}
       <View style={styles.playlistTracks}>
@@ -300,6 +617,19 @@ function Playlist({ distance, intensity }) {
           scrollEnabled={false}
         />
       </View>
+
+        {/* GetSong BPM API Credit Footer */}
+        <View style={styles.creditFooter}>
+          <Text style={styles.creditText}>
+            BPM data powered by{' '}
+            <Text 
+              style={styles.creditLink}
+              onPress={() => Linking.openURL('https://getsongbpm.com')}
+            >
+              GetSong BPM
+            </Text>
+          </Text>
+        </View>
     </ScrollView>
     </View>
   )
