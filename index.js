@@ -1,5 +1,5 @@
 import { registerRootComponent } from 'expo';
-import QuickRun from './src/QuickRun';
+import App from './src/App';
 
-registerRootComponent(QuickRun);
+registerRootComponent(App);
 

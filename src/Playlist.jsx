@@ -14,6 +14,7 @@ import { playlistStyles as styles } from './styles'
 import { generatePlaylist, fetchAndFilterPlaylist } from './services/playlistService'
 import RunningPage from './RunningPage'
 import PaceVisualization from './PaceVisualization'
+import { saveRun } from './services/runDataService'
 import {
   useAuthRequest,
   exchangeCodeForTokens,
@@ -264,11 +265,44 @@ function Playlist({ distance, intensity, onBackToHome }) {
     setShowRunningPage(true)
   }
 
-  const handleStop = (data) => {
+  const handleStop = async (data) => {
     setShowRunningPage(false)
     setWorkoutData(data) // Store workout data with samples
     setShowVisualization(true)
     setCurrentSongIndex(0)
+    
+    // Save run data to history
+    try {
+      // Calculate number of unique songs played from samples
+      const uniqueSongs = new Set()
+      if (data.samples && data.samples.length > 0) {
+        data.samples.forEach(sample => {
+          if (sample.song && sample.song.title) {
+            uniqueSongs.add(`${sample.song.title}-${sample.song.artist}`)
+          }
+        })
+      }
+      
+      const runData = {
+        totalDistance: parseFloat(data.totalDistance) || 0,
+        totalTime: data.totalTime || '00:00:00',
+        averagePace: data.averagePace || '0:00',
+        songsPlayed: uniqueSongs.size,
+        samples: data.samples || [],
+      }
+      
+      console.log('Attempting to save run with data:', runData)
+      const saved = await saveRun(runData)
+      if (saved) {
+        console.log('Run saved successfully to history')
+      } else {
+        console.error('Failed to save run to history')
+      }
+    } catch (error) {
+      console.error('Error saving run data:', error)
+      console.error('Error stack:', error.stack)
+      // Don't block the UI if saving fails
+    }
   }
 
   const handleCloseVisualization = () => {

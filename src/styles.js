@@ -663,3 +663,199 @@ export const runningPageStyles = StyleSheet.create({
   },
 })
 
+// Activity Component Styles
+export const activityStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  header: {
+    paddingHorizontal: 20,
+    paddingTop: 60,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  titleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  titleIcon: {
+    marginRight: 12,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#000000',
+    fontFamily: Platform.OS === 'web' ? 'Figtree, sans-serif' : undefined,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#666666',
+    fontFamily: Platform.OS === 'web' ? 'Figtree, sans-serif' : undefined,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  emptyText: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#666666',
+    marginTop: 16,
+    fontFamily: Platform.OS === 'web' ? 'Figtree, sans-serif' : undefined,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#999999',
+    marginTop: 8,
+    textAlign: 'center',
+    fontFamily: Platform.OS === 'web' ? 'Figtree, sans-serif' : undefined,
+  },
+  listContent: {
+    padding: 20,
+  },
+  runItem: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    marginBottom: 12,
+    overflow: 'hidden',
+  },
+  runItemContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+  },
+  runItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  runItemInfo: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  runItemDate: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#000000',
+    marginBottom: 4,
+    fontFamily: Platform.OS === 'web' ? 'Figtree, sans-serif' : undefined,
+  },
+  runItemDistance: {
+    fontSize: 14,
+    color: '#666666',
+    fontFamily: Platform.OS === 'web' ? 'Figtree, sans-serif' : undefined,
+  },
+})
+
+// Run Detail Component Styles
+export const runDetailStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 60,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  backButton: {
+    padding: 8,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#000000',
+    fontFamily: Platform.OS === 'web' ? 'Figtree, sans-serif' : undefined,
+  },
+  placeholder: {
+    width: 40,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: 20,
+    paddingBottom: 40,
+  },
+  section: {
+    marginBottom: 24,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666666',
+    marginLeft: 8,
+    fontFamily: Platform.OS === 'web' ? 'Figtree, sans-serif' : undefined,
+  },
+  sectionValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#000000',
+    fontFamily: Platform.OS === 'web' ? 'Figtree, sans-serif' : undefined,
+  },
+  songCard: {
+    backgroundColor: '#F8F8F8',
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 8,
+  },
+  songTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#000000',
+    marginBottom: 4,
+    fontFamily: Platform.OS === 'web' ? 'Figtree, sans-serif' : undefined,
+  },
+  songArtist: {
+    fontSize: 14,
+    color: '#666666',
+    marginBottom: 8,
+    fontFamily: Platform.OS === 'web' ? 'Figtree, sans-serif' : undefined,
+  },
+  songPace: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#5809C0',
+    fontFamily: Platform.OS === 'web' ? 'Figtree, sans-serif' : undefined,
+  },
+  deleteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FF3B30',
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 20,
+    gap: 8,
+  },
+  deleteButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    fontFamily: Platform.OS === 'web' ? 'Figtree, sans-serif' : undefined,
+  },
+})
+
