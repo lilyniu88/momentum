@@ -3,7 +3,9 @@
     "name": "momentum",
     "slug": "momentum",
     "scheme": "momentum",
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "assets/**/*"
+    ],
     "plugins": [
       [
         "expo-location",

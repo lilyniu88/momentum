@@ -617,19 +617,7 @@ function Playlist({ distance, intensity, onBackToHome }) {
           scrollEnabled={false}
         />
       </View>
-
-        {/* GetSong BPM API Credit Footer */}
-        <View style={styles.creditFooter}>
-          <Text style={styles.creditText}>
-            BPM data powered by{' '}
-            <Text 
-              style={styles.creditLink}
-              onPress={() => Linking.openURL('https://getsongbpm.com')}
-            >
-              GetSong BPM
-            </Text>
-          </Text>
-        </View>
+        
     </ScrollView>
     </View>
   )
