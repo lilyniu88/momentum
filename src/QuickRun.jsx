@@ -10,7 +10,7 @@ import { FontAwesome5 } from '@expo/vector-icons'
 import Playlist from './Playlist'
 import { quickRunStyles as styles } from './styles'
 
-function QuickRun() {
+function QuickRun({ onRunStart, onRunStop }) {
   const [distance, setDistance] = useState('')
   const [intensity, setIntensity] = useState('')
   const [showPlaylist, setShowPlaylist] = useState(false)
@@ -47,10 +47,22 @@ function QuickRun() {
     // Reset filters when coming back
     setDistance('')
     setIntensity('')
+    // Notify App that run has stopped
+    if (onRunStop) {
+      onRunStop()
+    }
   }
 
   if (showPlaylist) {
-    return <Playlist distance={distance} intensity={intensity} onBackToHome={handleBackToHome} />
+    return (
+      <Playlist 
+        distance={distance} 
+        intensity={intensity} 
+        onBackToHome={handleBackToHome}
+        onRunStart={onRunStart}
+        onRunStop={onRunStop}
+      />
+    )
   }
 
   const renderPickerModal = (options, selectedValue, onSelect, isVisible, onClose) => (

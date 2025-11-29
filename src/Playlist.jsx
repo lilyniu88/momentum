@@ -26,7 +26,7 @@ import {
 } from './services/spotifyAuth'
 import { fetchTopTracksWithFeatures, getAlbumCoverArt, getTopTracks, startPlayback, getAvailableDevices, transferPlayback } from './services/spotifyApi'
 
-function Playlist({ distance, intensity, onBackToHome }) {
+function Playlist({ distance, intensity, onBackToHome, onRunStart, onRunStop }) {
   const [showRunningPage, setShowRunningPage] = useState(false)
   const [showVisualization, setShowVisualization] = useState(false)
   const [currentSongIndex, setCurrentSongIndex] = useState(0)
@@ -263,6 +263,10 @@ function Playlist({ distance, intensity, onBackToHome }) {
       }
     }
     setShowRunningPage(true)
+    // Notify App that run has started
+    if (onRunStart) {
+      onRunStart()
+    }
   }
 
   const handleStop = async (data) => {
@@ -270,6 +274,11 @@ function Playlist({ distance, intensity, onBackToHome }) {
     setWorkoutData(data) // Store workout data with samples
     setShowVisualization(true)
     setCurrentSongIndex(0)
+    
+    // Notify App that run has stopped
+    if (onRunStop) {
+      onRunStop()
+    }
     
     // Save run data to history
     try {
@@ -333,7 +342,13 @@ function Playlist({ distance, intensity, onBackToHome }) {
         onStop={handleStop}
         onPause={() => {}}
         onSkip={handleSkip}
-        onBack={() => setShowRunningPage(false)}
+        onBack={() => {
+          setShowRunningPage(false)
+          // Notify App that run has stopped
+          if (onRunStop) {
+            onRunStop()
+          }
+        }}
       />
     )
   }
