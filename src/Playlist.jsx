@@ -13,6 +13,7 @@ import { MaterialIcons } from '@expo/vector-icons'
 import { playlistStyles as styles } from './styles'
 import { generatePlaylist, fetchAndFilterPlaylist } from './services/playlistService'
 import RunningPage from './RunningPage'
+import PaceVisualization from './PaceVisualization'
 import {
   useAuthRequest,
   exchangeCodeForTokens,
@@ -24,9 +25,11 @@ import {
 } from './services/spotifyAuth'
 import { fetchTopTracksWithFeatures, getAlbumCoverArt, getTopTracks, startPlayback, getAvailableDevices, transferPlayback } from './services/spotifyApi'
 
-function Playlist({ distance, intensity }) {
+function Playlist({ distance, intensity, onBackToHome }) {
   const [showRunningPage, setShowRunningPage] = useState(false)
+  const [showVisualization, setShowVisualization] = useState(false)
   const [currentSongIndex, setCurrentSongIndex] = useState(0)
+  const [workoutData, setWorkoutData] = useState(null)
   const [authReady, setAuthReady] = useState(false)
   const [spotifySongs, setSpotifySongs] = useState([])
   const [isLoadingSpotify, setIsLoadingSpotify] = useState(false)
@@ -261,13 +264,28 @@ function Playlist({ distance, intensity }) {
     setShowRunningPage(true)
   }
 
-  const handleStop = () => {
+  const handleStop = (data) => {
     setShowRunningPage(false)
+    setWorkoutData(data) // Store workout data with samples
+    setShowVisualization(true)
     setCurrentSongIndex(0)
+  }
+
+  const handleCloseVisualization = () => {
+    setShowVisualization(false)
+    // Go back to home screen (QuickRun)
+    if (onBackToHome) {
+      onBackToHome()
+    }
   }
 
   const handleSkip = () => {
     setCurrentSongIndex((prev) => (prev + 1) % songs.length)
+  }
+
+  // Show visualization if run was stopped
+  if (showVisualization) {
+    return <PaceVisualization onClose={handleCloseVisualization} workoutData={workoutData} />
   }
 
   // Show running page if play button was clicked
@@ -281,6 +299,7 @@ function Playlist({ distance, intensity }) {
         onStop={handleStop}
         onPause={() => {}}
         onSkip={handleSkip}
+        onBack={() => setShowRunningPage(false)}
       />
     )
   }
@@ -371,6 +390,20 @@ function Playlist({ distance, intensity }) {
 
   return (
     <View style={styles.playlistPage}>
+      {/* Back Button */}
+      <View style={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 10 }}>
+        <Pressable 
+          onPress={() => {
+            if (onBackToHome) {
+              onBackToHome()
+            }
+          }}
+          style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start' }}
+        >
+          <MaterialIcons name="arrow-back" size={24} color="#000000" />
+          <Text style={{ marginLeft: 8, fontSize: 16, color: '#000000' }}>Back</Text>
+        </Pressable>
+      </View>
       <ScrollView style={styles.scrollView}>
         {/* Playlist Header */}
       <View style={styles.playlistHeader}>
@@ -477,6 +510,20 @@ function Playlist({ distance, intensity }) {
                     <Pressable style={styles.actionIconBtn}>
                       <MaterialIcons name="download" size={20} color="#5809C0" />
                     </Pressable>
+                    <Pressable 
+                      style={styles.actionIconBtn}
+                      onPress={async () => {
+                        console.log('Disconnecting Spotify...')
+                        await clearTokens()
+                        setAuthReady(false)
+                        setSpotifySongs([])
+                        setAuthError(null)
+                        setHasActiveDevice(null)
+                        console.log('Spotify disconnected. Please reconnect to grant permissions.')
+                      }}
+                    >
+                      <MaterialIcons name="logout" size={20} color="#5809C0" />
+                    </Pressable>
                   </View>
                   <Pressable style={styles.playButton} onPress={handlePlay}>
                     <MaterialIcons name="play-arrow" size={24} color="#FFFFFF" />
@@ -489,13 +536,45 @@ function Playlist({ distance, intensity }) {
           <View style={styles.errorContainer}>
             <Text style={styles.errorText}>{authError}</Text>
                   {(authError.includes('Missing permissions') || authError.includes('Permissions missing')) ? (
-                    <Text style={styles.redirectUriHint}>
-                      Please reconnect Spotify to grant playback permissions.
-                    </Text>
+                    <>
+                      <Text style={styles.redirectUriHint}>
+                        Please disconnect and reconnect Spotify to grant playback permissions.
+                      </Text>
+                      <Pressable 
+                        style={[styles.spotifyConnectButton, { marginTop: 12, backgroundColor: '#5809C0' }]}
+                        onPress={async () => {
+                          console.log('Disconnecting Spotify...')
+                          await clearTokens()
+                          setAuthReady(false)
+                          setSpotifySongs([])
+                          setAuthError(null)
+                          setHasActiveDevice(null)
+                          console.log('Spotify disconnected. Please reconnect to grant permissions.')
+                        }}
+                      >
+                        <Text style={styles.spotifyConnectText}>Disconnect & Reconnect</Text>
+                      </Pressable>
+                    </>
                   ) : (authError.includes('Authentication required') || authError.includes('No valid access token')) ? (
-                    <Text style={styles.redirectUriHint}>
-                      Please reconnect Spotify.
-                    </Text>
+                    <>
+                      <Text style={styles.redirectUriHint}>
+                        Please disconnect and reconnect Spotify.
+                      </Text>
+                      <Pressable 
+                        style={[styles.spotifyConnectButton, { marginTop: 12, backgroundColor: '#5809C0' }]}
+                        onPress={async () => {
+                          console.log('Disconnecting Spotify...')
+                          await clearTokens()
+                          setAuthReady(false)
+                          setSpotifySongs([])
+                          setAuthError(null)
+                          setHasActiveDevice(null)
+                          console.log('Spotify disconnected. Please reconnect to grant permissions.')
+                        }}
+                      >
+                        <Text style={styles.spotifyConnectText}>Disconnect & Reconnect</Text>
+                      </Pressable>
+                    </>
                   ) : (authError.includes('No active device')) ? (
                     <Text style={styles.redirectUriHint}>
                       Open Spotify on your phone, computer, or web player, then try playing again.

@@ -21,12 +21,21 @@ const formatTime = (totalSeconds) => {
 }
 
 /**
+ * Convert pace string (e.g., "6:30") to seconds per mile
+ */
+const paceToSeconds = (paceString) => {
+  if (paceString === '0:00') return 0
+  const [minutes, seconds] = paceString.split(':').map(Number)
+  return minutes * 60 + seconds
+}
+
+/**
  * Hook for workout data collection
  * Uses GPS-based distance calculation (works in Expo Go)
  * - Distance from GPS → calculates pace
  * Note: BPM comes from the song's BPM
  */
-const useWorkoutData = (isPaused, location = null) => {
+const useWorkoutData = (isPaused, location = null, isLocationReady = false, currentSong = null) => {
   const [workoutData, setWorkoutData] = useState({
     pace: '0:00',
     distance: '0.00',
@@ -37,20 +46,28 @@ const useWorkoutData = (isPaused, location = null) => {
   const [totalDistance, setTotalDistance] = useState(0) // in meters
   const workoutStartTimeRef = useRef(null)
   const previousLocationRef = useRef(null) // For GPS distance calculation
+  const locationHistoryRef = useRef([]) // Track recent locations for current pace calculation
+  const lastPaceUpdateRef = useRef(0) // Track when we last updated pace
+  const samplesRef = useRef([]) // Track continuous samples for visualization
+  const lastSampleTimeRef = useRef(0) // Track when we last recorded a sample
 
-  // Initialize workout when component mounts or when workout starts
+  // Initialize workout when location is ready (not on mount)
   useEffect(() => {
-    if (!workoutStartTimeRef.current) {
+    if (isLocationReady && !workoutStartTimeRef.current) {
       workoutStartTimeRef.current = new Date().toISOString()
       previousLocationRef.current = null
+      locationHistoryRef.current = []
+      lastPaceUpdateRef.current = 0
+      samplesRef.current = []
+      lastSampleTimeRef.current = 0
       setTotalDistance(0)
       setElapsedSeconds(0)
     }
-  }, [])
+  }, [isLocationReady])
 
-  // Timer: Update elapsed time every second
+  // Timer: Update elapsed time every second (only start when location is ready)
   useEffect(() => {
-    if (isPaused) {
+    if (!isLocationReady || isPaused) {
       return
     }
 
@@ -59,7 +76,7 @@ const useWorkoutData = (isPaused, location = null) => {
     }, 1000)
 
     return () => clearInterval(timerInterval)
-  }, [isPaused])
+  }, [isPaused, isLocationReady])
 
   // Calculate distance from GPS coordinates
   useEffect(() => {
@@ -93,33 +110,97 @@ const useWorkoutData = (isPaused, location = null) => {
       setTotalDistance(prev => prev + distance)
     }
     
+    // Add to location history for current pace calculation
+    locationHistoryRef.current.push({
+      location: { ...location },
+      timestamp: Date.now()
+    })
+    
+    // Keep only last 60 seconds of location history (to limit memory usage)
+    const oneMinuteAgo = Date.now() - 60000
+    locationHistoryRef.current = locationHistoryRef.current.filter(
+      entry => entry.timestamp >= oneMinuteAgo
+    )
+    
     // Always update previous location, even if we don't add the distance
     // This prevents accumulating noise over multiple updates
     previousLocationRef.current = location
   }, [location, isPaused])
 
-  // Calculate and update derived metrics whenever data changes
+  // Update pace every 5 seconds using raw pace calculation
   useEffect(() => {
-    const {
-      calculatePace,
-      metersToMiles,
-    } = require('./services/healthService')
+    if (!isLocationReady || isPaused) {
+      return
+    }
 
-    // Calculate derived metrics
-    const pace = elapsedSeconds > 0 && totalDistance > 0 
-      ? calculatePace(totalDistance, elapsedSeconds)
-      : '0:00'
-    const distanceMiles = metersToMiles(totalDistance)
+    // Calculate pace directly from location history
+    const updatePace = () => {
+      const {
+        calculateCurrentPace,
+        metersToMiles,
+      } = require('./services/healthService')
 
-    // Update workout data
-    setWorkoutData({
-      pace: pace,
-      distance: distanceMiles.toFixed(2),
+      // Calculate current pace from recent location history (20 second window for current pace)
+      const currentPace = calculateCurrentPace(locationHistoryRef.current, 20)
+      const distanceMiles = metersToMiles(totalDistance)
+
+      // Update workout data with raw pace calculation
+      setWorkoutData(prev => ({
+        ...prev,
+        pace: currentPace,
+        distance: distanceMiles.toFixed(2),
+        time: formatTime(elapsedSeconds),
+      }))
+      
+      lastPaceUpdateRef.current = Date.now()
+
+      // Record continuous samples every 10 seconds OR every 0.05 miles (whichever comes first)
+      // This gives us a full sample stream for visualization, even for short runs
+      const now = Date.now()
+      const timeSinceLastSample = (now - lastSampleTimeRef.current) / 1000
+      const distanceSinceLastSample = distanceMiles - (samplesRef.current.length > 0 
+        ? samplesRef.current[samplesRef.current.length - 1].distance 
+        : 0)
+      
+      // Record sample if: 10 seconds passed OR moved 0.05 miles (or first sample)
+      const shouldRecordSample = timeSinceLastSample >= 10 || distanceSinceLastSample >= 0.05 || samplesRef.current.length === 0
+      
+      if (shouldRecordSample) {
+        const paceSeconds = paceToSeconds(currentPace)
+        // Record sample even if pace is 0 or distance is 0 (for stationary/short runs)
+        samplesRef.current.push({
+          distance: parseFloat(distanceMiles.toFixed(3)), // Use 3 decimals for precision
+          pace: paceSeconds, // seconds per mile (0 if no movement)
+          timestamp: now,
+          elapsedSeconds: elapsedSeconds,
+          song: currentSong ? {
+            title: currentSong.title,
+            artist: currentSong.artist,
+            bpm: currentSong.bpm || 0,
+          } : null,
+        })
+        lastSampleTimeRef.current = now
+      }
+    }
+
+    // Update immediately on start
+    updatePace()
+
+    // Then update every 5 seconds
+    const paceUpdateInterval = setInterval(updatePace, 5000)
+
+    return () => clearInterval(paceUpdateInterval)
+  }, [isPaused, elapsedSeconds, totalDistance, isLocationReady])
+
+  // Update time every second for smooth display (distance and pace update with pace interval)
+  useEffect(() => {
+    setWorkoutData(prev => ({
+      ...prev,
       time: formatTime(elapsedSeconds),
-    })
-  }, [elapsedSeconds, totalDistance])
+    }))
+  }, [elapsedSeconds])
 
-  return workoutData
+  return { workoutData, samples: samplesRef.current }
 }
 
 /**
@@ -223,12 +304,17 @@ const useLocation = (isWorkoutPaused) => {
 }
 
 
-function RunningPage({ playlistTitle, currentSong, currentSongIndex = 0, allSongs = [], onStop, onPause, onSkip }) {
+function RunningPage({ playlistTitle, currentSong, currentSongIndex = 0, allSongs = [], onStop, onPause, onSkip, onBack }) {
   const [isWorkoutPaused, setIsWorkoutPaused] = useState(false)
   const [isSongPaused, setIsSongPaused] = useState(false)
   const [albumImageUrl, setAlbumImageUrl] = useState(null)
+  const [isMapReady, setIsMapReady] = useState(false)
   const { location, errorMsg, isLoading } = useLocation(isWorkoutPaused)
-  const workoutData = useWorkoutData(isWorkoutPaused, location)
+  
+  // Location is ready when we have a location and map has loaded
+  const isLocationReady = !isLoading && location !== null && isMapReady
+  
+  const { workoutData, samples } = useWorkoutData(isWorkoutPaused, location, isLocationReady, currentSong)
 
   // Fetch album cover art when current song changes
   useEffect(() => {
@@ -274,8 +360,41 @@ function RunningPage({ playlistTitle, currentSong, currentSongIndex = 0, allSong
     if (onPause) onPause(!isWorkoutPaused)
   }
 
-  const handleStop = () => {
-    if (onStop) onStop()
+  const handleStop = async () => {
+    try {
+      // Stop/pause playback when run is stopped
+      await pausePlayback()
+    } catch (error) {
+      // Continue even if pause fails (e.g., no active device)
+      console.error('Error pausing playback on stop:', error)
+    }
+    // Navigate to visualization with sample data
+    if (onStop) {
+      const {
+        metersToMiles,
+      } = require('./services/healthService')
+      
+      const finalDistance = parseFloat(workoutData.distance) || 0
+      
+      // Calculate average pace from samples
+      const calculateAveragePace = (samplePoints) => {
+        if (!samplePoints || samplePoints.length === 0) return '0:00'
+        const validPaces = samplePoints.filter(p => p.pace > 0).map(p => p.pace)
+        if (validPaces.length === 0) return '0:00'
+        const totalPaceSeconds = validPaces.reduce((sum, pace) => sum + pace, 0)
+        const avgPaceSeconds = totalPaceSeconds / validPaces.length
+        const minutes = Math.floor(avgPaceSeconds / 60)
+        const seconds = Math.floor(avgPaceSeconds % 60)
+        return `${minutes}:${String(seconds).padStart(2, '0')}`
+      }
+      
+      onStop({
+        samples: samples,
+        totalDistance: finalDistance,
+        totalTime: workoutData.time,
+        averagePace: calculateAveragePace(samples),
+      })
+    }
   }
 
   const handleSkip = async () => {
@@ -308,11 +427,38 @@ function RunningPage({ playlistTitle, currentSong, currentSongIndex = 0, allSong
   const albumArtColor = '#EFEFEF'
   const albumArtTextColor = '#000000'
 
+  // Show loading screen until location is available
+  if (isLoading || !location) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#5809C0" />
+        <Text style={{ marginTop: 16, fontSize: 16, color: '#5809C0' }}>
+          {isLoading ? 'Getting your location...' : 'Waiting for location...'}
+        </Text>
+        {errorMsg && (
+          <Text style={{ marginTop: 8, fontSize: 14, color: '#666', textAlign: 'center', paddingHorizontal: 20 }}>
+            {errorMsg}
+          </Text>
+        )}
+      </View>
+    )
+  }
+
   return (
     <View style={styles.container}>
       {/* Top Section: Playlist Title, Current Song, Metrics, Controls */}
       <View style={styles.topSection}>
-        <Text style={styles.playlistTitle}>{playlistTitle}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+          <Text style={styles.playlistTitle}>{playlistTitle}</Text>
+          {onBack && (
+            <Pressable 
+              onPress={onBack}
+              style={{ padding: 8 }}
+            >
+              <MaterialIcons name="close" size={28} color="#000000" />
+            </Pressable>
+          )}
+        </View>
         
         <View style={styles.currentSongSection}>
           <View style={[styles.albumArtSmall, { backgroundColor: albumArtColor, overflow: 'hidden' }]}>
@@ -354,42 +500,38 @@ function RunningPage({ playlistTitle, currentSong, currentSongIndex = 0, allSong
 
       {/* Middle Section: Map View */}
       <View style={styles.mapSection}>
-        {isLoading ? (
-          <View style={styles.mapPlaceholder}>
+        {!isMapReady && (
+          <View style={[styles.map, { justifyContent: 'center', alignItems: 'center', backgroundColor: '#f0f0f0' }]}>
             <ActivityIndicator size="large" color="#5809C0" />
-            <Text style={styles.mapPlaceholderText}>Loading map...</Text>
-          </View>
-        ) : location ? (
-          <MapView
-            style={styles.map}
-            initialRegion={{
-              latitude: location.latitude,
-              longitude: location.longitude,
-              latitudeDelta: 0.01,
-              longitudeDelta: 0.01,
-            }}
-            region={{
-              latitude: location.latitude,
-              longitude: location.longitude,
-              latitudeDelta: 0.01,
-              longitudeDelta: 0.01,
-            }}
-            showsUserLocation={true}
-            showsMyLocationButton={false}
-            followsUserLocation={!isWorkoutPaused}
-            scrollEnabled={false}
-            zoomEnabled={false}
-            rotateEnabled={false}
-            pitchEnabled={false}
-          />
-        ) : (
-          <View style={styles.mapPlaceholder}>
-            <Text style={styles.mapPlaceholderText}>Map unavailable</Text>
-            {errorMsg && (
-              <Text style={styles.mapPlaceholderSubtext}>{errorMsg}</Text>
-            )}
+            <Text style={{ marginTop: 16, fontSize: 14, color: '#5809C0' }}>Loading map...</Text>
           </View>
         )}
+        <MapView
+          style={[styles.map, !isMapReady && { position: 'absolute', opacity: 0 }]}
+          initialRegion={{
+            latitude: location.latitude,
+            longitude: location.longitude,
+            latitudeDelta: 0.01,
+            longitudeDelta: 0.01,
+          }}
+          region={{
+            latitude: location.latitude,
+            longitude: location.longitude,
+            latitudeDelta: 0.01,
+            longitudeDelta: 0.01,
+          }}
+          showsUserLocation={true}
+          showsMyLocationButton={false}
+          followsUserLocation={!isWorkoutPaused}
+          scrollEnabled={false}
+          zoomEnabled={false}
+          rotateEnabled={false}
+          pitchEnabled={false}
+          onMapReady={() => {
+            // Map has finished loading, now we can start the timer
+            setIsMapReady(true)
+          }}
+        />
       </View>
 
       {/* Bottom Section: Performance Metrics & Controls */}
