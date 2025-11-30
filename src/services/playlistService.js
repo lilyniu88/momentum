@@ -218,13 +218,117 @@ const getAlbumArt = (album) => {
 };
 
 /**
+ * Fast validation: Check if a playlist has enough tracks with BPM in the right range
+ * Uses a smaller sample and simplified logic for speed
+ * @param {Array} tracks - Array of Spotify track objects
+ * @param {string} distance - 'short', 'medium', or 'long'
+ * @param {string} intensity - 'low', 'medium', or 'high'
+ * @param {number} minTracks - Minimum number of tracks required (default: 3)
+ * @param {number} sampleSize - Number of tracks to sample for validation (default: 15)
+ * @returns {Promise<boolean>} - True if playlist has enough tracks
+ */
+export const validatePlaylist = async (tracks, distance, intensity, minTracks = 3, sampleSize = 15) => {
+  if (!tracks || tracks.length === 0) {
+    return false;
+  }
+
+  // Use a smaller sample for faster validation
+  const sampleTracks = tracks.slice(0, sampleSize);
+  
+  // Map tracks to basic format
+  const tracksWithInfo = sampleTracks
+    .filter(track => track && track.id)
+    .map((track) => {
+      const artist = track.artists && track.artists.length > 0
+        ? track.artists[0].name
+        : 'Unknown Artist';
+      
+      return {
+        id: track.id,
+        title: track.name || 'Unknown Title',
+        artist,
+        duration_ms: track.duration_ms || 0,
+      };
+    });
+
+  // Prepare songs for BPM lookup
+  const songsForBpmLookup = tracksWithInfo.map(track => ({
+    title: track.title,
+    artist: track.artist,
+  }));
+
+  // Query database for BPM data (only for sample)
+  let songsWithBpm = [];
+  try {
+    songsWithBpm = await batchGetBpmsFromDatabase(songsForBpmLookup);
+  } catch (error) {
+    // If database query fails, assume tracks don't have BPM data
+    songsWithBpm = songsForBpmLookup.map(song => ({ ...song, bpm: null }));
+  }
+
+  // Create BPM map
+  const bpmMap = {};
+  songsWithBpm.forEach(song => {
+    const key = `${song.title.toLowerCase()}|${song.artist.toLowerCase()}`;
+    bpmMap[key] = song.bpm;
+  });
+
+  // Get BPM range for intensity
+  const { min, max } = getBPMRange(intensity);
+  
+  // Count tracks that match the intensity (BPM range)
+  let matchingTracks = 0;
+  let totalDuration = 0;
+  
+  tracksWithInfo.forEach((track) => {
+    const key = `${track.title.toLowerCase()}|${track.artist.toLowerCase()}`;
+    const bpm = bpmMap[key];
+    
+    // Check if BPM matches intensity range
+    if (bpm !== null && bpm !== undefined) {
+      let matches = false;
+      if (min === 120 && max === 120) {
+        matches = bpm === 120;
+      } else {
+        matches = bpm >= min && (max === Infinity || bpm < max);
+      }
+      
+      if (matches) {
+        matchingTracks++;
+        totalDuration += track.duration_ms / 1000; // Convert to seconds
+      }
+    }
+  });
+
+  // Get minimum duration requirement
+  const { min: minDuration } = getDurationRange(distance);
+  const minDurationSeconds = minDuration * 60;
+  
+  // If sample has enough, assume full list will too
+  // Otherwise, we need at least minTracks and sufficient duration
+  // For validation, we're more lenient - if sample shows promise, accept it
+  const hasEnoughTracks = matchingTracks >= Math.min(minTracks, 2); // At least 2 matching tracks in sample
+  const hasEnoughDuration = totalDuration >= (minDurationSeconds * 0.3); // At least 30% of required duration in sample
+  
+  // If we have enough in the sample, return true
+  // Otherwise, if we have very few matches, return false early
+  if (matchingTracks === 0) {
+    return false;
+  }
+  
+  // If sample looks promising, return true (full validation will happen when user selects)
+  return hasEnoughTracks && hasEnoughDuration;
+};
+
+/**
  * Fetch BPMs for tracks and filter by intensity and distance
  * @param {Array} tracks - Array of Spotify track objects
  * @param {string} distance - 'short', 'medium', or 'long'
  * @param {string} intensity - 'low', 'medium', or 'high'
+ * @param {boolean} allowFallback - Whether to allow fallback to intensity-based playlists (default: true)
  * @returns {Promise<Array>} - Filtered playlist with BPM data
  */
-export const fetchAndFilterPlaylist = async (tracks, distance, intensity) => {
+export const fetchAndFilterPlaylist = async (tracks, distance, intensity, allowFallback = true) => {
   if (!tracks || tracks.length === 0) {
     return [];
   }
@@ -315,7 +419,8 @@ export const fetchAndFilterPlaylist = async (tracks, distance, intensity) => {
   
   const needsMoreSongs = totalDuration < minDurationSeconds || filteredSongs.length < 3;
   
-  if (needsMoreSongs) {
+  // Only use fallback if allowed (skip for genre playlists to avoid duplicates)
+  if (needsMoreSongs && allowFallback) {
     const playlistId = getPlaylistIdForIntensity(intensity);
     if (playlistId) {
       try {

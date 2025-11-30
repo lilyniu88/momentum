@@ -135,7 +135,21 @@ export const playlistStyles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFFFF',
     ...(Platform.OS === 'web' && { minHeight: '100vh' }),
-    ...(Platform.OS !== 'web' && { paddingTop: 20 }),
+  },
+  backButtonContainer: {
+    paddingTop: 50,
+    paddingHorizontal: 20,
+    paddingBottom: 10,
+  },
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+  },
+  backText: {
+    marginLeft: 8,
+    fontSize: 16,
+    color: '#000000',
   },
   scrollView: {
     flex: 1,

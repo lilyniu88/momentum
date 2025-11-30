@@ -418,9 +418,12 @@ function RunningPage({ playlistTitle, currentSong, currentSongIndex = 0, allSong
           offset: { position: nextIndex },
           positionMs: 0,
         })
+        
+        setIsSongPaused(false)
       }
     } catch (error) {
       // Continue even if playback fails
+      console.warn('Error skipping track:', error)
     }
   }
 

@@ -41,6 +41,7 @@ const getRedirectUri = () => {
   });
   
   cachedRedirectUri = redirectUri;
+  console.log('REDIRECT URI:', redirectUri);
   return redirectUri;
 };
 

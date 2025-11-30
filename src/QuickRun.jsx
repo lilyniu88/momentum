@@ -7,13 +7,13 @@ import {
   Modal,
 } from 'react-native'
 import { FontAwesome5 } from '@expo/vector-icons'
-import Playlist from './Playlist'
+import PlaylistSelection from './PlaylistSelection'
 import { quickRunStyles as styles } from './styles'
 
 function QuickRun({ onRunStart, onRunStop }) {
   const [distance, setDistance] = useState('')
   const [intensity, setIntensity] = useState('')
-  const [showPlaylist, setShowPlaylist] = useState(false)
+  const [showPlaylistSelection, setShowPlaylistSelection] = useState(false)
   const [showDistanceModal, setShowDistanceModal] = useState(false)
   const [showIntensityModal, setShowIntensityModal] = useState(false)
 
@@ -33,7 +33,7 @@ function QuickRun({ onRunStart, onRunStop }) {
 
   const handleStart = () => {
     if (distance && intensity) {
-      setShowPlaylist(true)
+      setShowPlaylistSelection(true)
     }
   }
 
@@ -42,8 +42,8 @@ function QuickRun({ onRunStart, onRunStop }) {
     return option ? option.label : options[0].label
   }
 
-  const handleBackToHome = () => {
-    setShowPlaylist(false)
+  const handleBackToSelection = () => {
+    setShowPlaylistSelection(false)
     // Reset filters when coming back
     setDistance('')
     setIntensity('')
@@ -53,12 +53,12 @@ function QuickRun({ onRunStart, onRunStop }) {
     }
   }
 
-  if (showPlaylist) {
+  if (showPlaylistSelection) {
     return (
-      <Playlist 
+      <PlaylistSelection 
         distance={distance} 
         intensity={intensity} 
-        onBackToHome={handleBackToHome}
+        onBack={handleBackToSelection}
         onRunStart={onRunStart}
         onRunStop={onRunStop}
       />

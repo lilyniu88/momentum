@@ -24,9 +24,17 @@ import {
   clearTokens,
   getRedirectUri,
 } from './services/spotifyAuth'
-import { fetchTopTracksWithFeatures, getAlbumCoverArt, getTopTracks, startPlayback, getAvailableDevices, transferPlayback } from './services/spotifyApi'
+import { 
+  getTopTracks,
+  getPopularTracks,
+  getGenreTracks,
+  startPlayback, 
+  getAvailableDevices, 
+  transferPlayback 
+} from './services/spotifyApi'
+import { saveRecentlySelected } from './services/playlistHistoryService'
 
-function Playlist({ distance, intensity, onBackToHome, onRunStart, onRunStop }) {
+function Playlist({ distance, intensity, playlistType = 'top-tracks', onBackToHome, onBackToSelection, onRunStart, onRunStop }) {
   const [showRunningPage, setShowRunningPage] = useState(false)
   const [showVisualization, setShowVisualization] = useState(false)
   const [currentSongIndex, setCurrentSongIndex] = useState(0)
@@ -40,10 +48,10 @@ function Playlist({ distance, intensity, onBackToHome, onRunStart, onRunStop }) 
 
   const [request, response, promptAsync] = useAuthRequest()
 
-  // Check authentication on mount
+  // Check authentication on mount and when playlistType changes
   useEffect(() => {
     checkAuthAndFetchTracks()
-  }, [])
+  }, [playlistType])
 
   useEffect(() => {
     if (response?.type === 'success') {
@@ -111,25 +119,43 @@ function Playlist({ distance, intensity, onBackToHome, onRunStart, onRunStop }) 
     }
   }
 
-  // Fetch top tracks from Spotify
+  // Fetch tracks from Spotify based on playlist type
   const fetchSpotifyTracks = async () => {
     try {
       setIsLoadingSpotify(true)
       setAuthError(null)
       
-      // Get raw tracks from Spotify (without BPM data)
-      const rawTracks = await getTopTracks({
-        time_range: 'short_term',
-        limit: 50,
-      })
+      let rawTracks = []
       
-      console.log(`Retrieved ${rawTracks?.length || 0} tracks from Spotify`)
+      // Fetch tracks based on playlist type
+      if (playlistType === 'top-tracks') {
+        // Top Tracks: Spotify's global popular tracks
+        rawTracks = await getPopularTracks(50)
+      } else if (playlistType === 'suggested') {
+        // Suggested: User's actual listening history (personalized)
+        rawTracks = await getTopTracks({
+          time_range: 'short_term',
+          limit: 50,
+        })
+      } else if (playlistType.startsWith('genre-')) {
+        // Extract genre from playlist type (e.g., 'genre-pop' -> 'pop')
+        const genre = playlistType.replace('genre-', '')
+        rawTracks = await getGenreTracks(genre, 50)
+      } else {
+        // Default to popular tracks
+        rawTracks = await getPopularTracks(50)
+      }
+      
+      console.log(`Retrieved ${rawTracks?.length || 0} tracks from Spotify (type: ${playlistType})`)
       
       // Fetch BPMs and filter by distance/intensity in playlistService
+      // Disable fallback for genre playlists to avoid duplicate tracks across genres
+      const isGenrePlaylist = playlistType.startsWith('genre-')
       const filteredTracks = await fetchAndFilterPlaylist(
         rawTracks || [],
         distance,
-        intensity
+        intensity,
+        !isGenrePlaylist // Only allow fallback for non-genre playlists
       )
       
       console.log(`Loaded ${filteredTracks?.length || 0} filtered tracks`)
@@ -239,6 +265,9 @@ function Playlist({ distance, intensity, onBackToHome, onRunStart, onRunStop }) 
           deviceId: targetDevice.id,
         })
         
+        // Save to recently selected only when playback actually starts
+        await saveRecentlySelected(playlistType)
+        
         setHasActiveDevice(true)
         setAuthError(null)
       } catch (error) {
@@ -316,8 +345,11 @@ function Playlist({ distance, intensity, onBackToHome, onRunStart, onRunStop }) 
 
   const handleCloseVisualization = () => {
     setShowVisualization(false)
-    // Go back to home screen (QuickRun)
-    if (onBackToHome) {
+    // Go back to playlist selection screen
+    if (onBackToSelection) {
+      onBackToSelection()
+    } else if (onBackToHome) {
+      // Fallback to home if no selection callback
       onBackToHome()
     }
   }
@@ -347,6 +379,10 @@ function Playlist({ distance, intensity, onBackToHome, onRunStart, onRunStop }) 
           // Notify App that run has stopped
           if (onRunStop) {
             onRunStop()
+          }
+          // Go back to playlist selection
+          if (onBackToSelection) {
+            onBackToSelection()
           }
         }}
       />
@@ -440,17 +476,19 @@ function Playlist({ distance, intensity, onBackToHome, onRunStart, onRunStop }) 
   return (
     <View style={styles.playlistPage}>
       {/* Back Button */}
-      <View style={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 10 }}>
+      <View style={styles.backButtonContainer}>
         <Pressable 
           onPress={() => {
-            if (onBackToHome) {
+            if (onBackToSelection) {
+              onBackToSelection()
+            } else if (onBackToHome) {
               onBackToHome()
             }
           }}
-          style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start' }}
+          style={styles.backButton}
         >
           <MaterialIcons name="arrow-back" size={24} color="#000000" />
-          <Text style={{ marginLeft: 8, fontSize: 16, color: '#000000' }}>Back</Text>
+          <Text style={styles.backText}>Back</Text>
         </Pressable>
       </View>
       <ScrollView style={styles.scrollView}>

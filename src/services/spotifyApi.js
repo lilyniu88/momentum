@@ -148,7 +148,7 @@ const makeRequest = async (endpoint, options = {}) => {
 };
 
 /**
- * Get user's top tracks
+ * Get user's top tracks (personalized based on listening history)
  */
 const getTopTracks = async (options = {}) => {
   const {
@@ -163,6 +163,42 @@ const getTopTracks = async (options = {}) => {
   
   const data = await makeRequest(`/me/top/tracks?${params.toString()}`);
   return data.items || [];
+};
+
+/**
+ * Get popular/global top tracks from Spotify
+ * Uses search API to find popular tracks
+ */
+const getPopularTracks = async (limit = 50) => {
+  try {
+    // Search for popular tracks - using a broad query that returns popular results
+    // We'll search for recent popular tracks
+    const params = new URLSearchParams({
+      q: 'year:2024',
+      type: 'track',
+      limit: Math.min(limit, 50).toString(),
+      market: 'US',
+    });
+    
+    const data = await makeRequest(`/search?${params.toString()}`);
+    const tracks = data.tracks?.items || [];
+    
+    // Sort by popularity if available, otherwise return as-is
+    return tracks.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+  } catch (error) {
+    console.error('Error fetching popular tracks:', error);
+    // Fallback: try to get tracks from a popular playlist
+    try {
+      // Spotify's "Today's Top Hits" playlist
+      const playlistId = '37i9dQZF1DXcBWIGoYBM5M';
+      const playlistTracks = await getPlaylistTracks(playlistId, limit);
+      // getPlaylistTracks already returns track objects, so return directly
+      return playlistTracks;
+    } catch (fallbackError) {
+      console.error('Error fetching popular tracks from playlist:', fallbackError);
+      throw error;
+    }
+  }
 };
 
 /**
@@ -457,6 +493,19 @@ const pausePlayback = async (deviceId = null) => {
       method: 'PUT',
     });
   } catch (error) {
+    // Handle "Restriction violated" error - this can happen when:
+    // 1. Player is already paused
+    // 2. Player is in a transitional state (e.g., just after skipping)
+    // 3. No active playback session
+    if (error.message?.includes('Restriction violated') || 
+        error.message?.includes('403') ||
+        error.reason === 'UNKNOWN') {
+      // Silently ignore - player is likely already paused or in invalid state
+      console.warn('Pause command ignored - player may already be paused or in transitional state');
+      return;
+    }
+    
+    // For other errors, still log and throw
     console.error('Error pausing playback:', error);
     throw error;
   }
@@ -554,6 +603,183 @@ const getAvailableDevices = async () => {
     }
     return [];
   }
+};
+
+/**
+ * Get user's top artists
+ * Reference: https://developer.spotify.com/documentation/web-api/reference/get-users-top-artists-and-tracks
+ * 
+ * @param {Object} options - Options for fetching top artists
+ * @param {string} options.time_range - 'short_term', 'medium_term', or 'long_term'
+ * @param {number} options.limit - Number of artists to fetch (default: 20)
+ * @returns {Promise<Array>} - Array of artist objects
+ */
+const getTopArtists = async (options = {}) => {
+  const {
+    time_range = 'medium_term',
+    limit = 20,
+  } = options;
+  
+  const params = new URLSearchParams({
+    time_range,
+    limit: limit.toString(),
+  });
+  
+  const data = await makeRequest(`/me/top/artists?${params.toString()}`);
+  return data.items || [];
+};
+
+/**
+ * Map genre names to normalized format for search API
+ * Since recommendations endpoint is deprecated, we use search API only
+ * 
+ * @param {string} genre - Genre name to normalize
+ * @returns {string} - Normalized genre name
+ */
+const normalizeGenreForSearch = (genre) => {
+  // Normalize genre name (lowercase, trim)
+  const normalized = genre.toLowerCase().trim();
+  
+  // Common genre mappings for search API
+  const genreMap = {
+    'hip-hop': 'hiphop',
+    'hip hop': 'hiphop',
+    'hiphop': 'hiphop',
+    'r&b': 'r-n-b',
+    'r and b': 'r-n-b',
+    'rnb': 'r-n-b',
+    'edm': 'electronic',
+    'dance': 'electronic',
+    'indie pop': 'indie',
+    'indie rock': 'indie',
+    'alternative': 'alternative',
+    'alt': 'alternative',
+    'pop': 'pop',
+    'rock': 'rock',
+    'electronic': 'electronic',
+    'indie': 'indie',
+    'country': 'country',
+    'jazz': 'jazz',
+    'blues': 'blues',
+    'latin': 'latin',
+    'metal': 'metal',
+    'punk': 'punk',
+    'reggae': 'reggae',
+    'folk': 'folk',
+  };
+  
+  // Check direct mapping
+  if (genreMap[normalized]) {
+    return genreMap[normalized];
+  }
+  
+  // Check if it contains a mapped genre
+  for (const [key, value] of Object.entries(genreMap)) {
+    if (normalized.includes(key) || key.includes(normalized)) {
+      return value;
+    }
+  }
+  
+  // Return normalized version (remove spaces, keep as-is)
+  return normalized.replace(/\s+/g, '');
+};
+
+/**
+ * Extract top genres from user's top artists
+ * Analyzes genres from top artists and returns most common genres
+ * 
+ * @param {number} limit - Number of genres to return (default: 5)
+ * @returns {Promise<Array<string>>} - Array of normalized genre strings
+ */
+const getTopGenres = async (limit = 5) => {
+  try {
+    const artists = await getTopArtists({ time_range: 'medium_term', limit: 50 });
+    
+    // Count genre occurrences
+    const genreCount = {};
+    for (const artist of artists) {
+      if (artist.genres && Array.isArray(artist.genres)) {
+        for (const genre of artist.genres) {
+          const normalizedGenre = normalizeGenreForSearch(genre);
+          genreCount[normalizedGenre] = (genreCount[normalizedGenre] || 0) + 1;
+        }
+      }
+    }
+    
+    // Sort by count and return top genres
+    const sortedGenres = Object.entries(genreCount)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, limit)
+      .map(([genre]) => genre);
+    
+    // If we don't have enough genres, add defaults
+    const defaultGenres = ['pop', 'rock', 'electronic'];
+    const finalGenres = [...new Set([...sortedGenres, ...defaultGenres])].slice(0, limit);
+    
+    return finalGenres.length > 0 ? finalGenres : defaultGenres.slice(0, limit);
+  } catch (error) {
+    console.error('Error getting top genres:', error);
+    // Return default genres if API fails
+    return ['pop', 'rock', 'electronic'];
+  }
+};
+
+/**
+ * Search for tracks by genre using Spotify Search API
+ * Workaround for deprecated recommendations endpoint
+ * Reference: https://developer.spotify.com/documentation/web-api/reference/search
+ * 
+ * @param {string} genre - Genre name to search for
+ * @param {number} limit - Number of tracks to return (default: 50, max: 50)
+ * @returns {Promise<Array>} - Array of track objects
+ */
+const searchTracksByGenre = async (genre, limit = 50) => {
+  const params = new URLSearchParams({
+    q: `genre:${genre}`,
+    type: 'track',
+    limit: Math.min(limit, 50).toString(),
+    market: 'US',
+  });
+  
+  const data = await makeRequest(`/search?${params.toString()}`);
+  return data.tracks?.items || [];
+};
+
+/**
+ * Get track recommendations based on genres
+ * Note: Spotify's /recommendations endpoint was deprecated in November 2024
+ * Uses search API as alternative
+ * 
+ * @param {Object} options - Recommendation options
+ * @param {Array<string>} options.seed_genres - Array of genre strings
+ * @param {number} options.limit - Number of tracks to return (default: 50, max: 50)
+ * @returns {Promise<Array>} - Array of track objects
+ */
+const getRecommendations = async (options = {}) => {
+  const {
+    seed_genres = [],
+    limit = 50,
+  } = options;
+  
+  if (seed_genres.length === 0) {
+    throw new Error('At least one genre seed is required');
+  }
+  
+  // Use search API with first genre
+  return await searchTracksByGenre(seed_genres[0], limit);
+};
+
+/**
+ * Get tracks for a specific genre using search API
+ * Note: Recommendations endpoint is deprecated, using search API only
+ * 
+ * @param {string} genre - Genre name (e.g., 'pop', 'rock', 'hip-hop')
+ * @param {number} limit - Number of tracks to return (default: 50)
+ * @returns {Promise<Array>} - Array of track objects
+ */
+const getGenreTracks = async (genre, limit = 50) => {
+  const normalizedGenre = normalizeGenreForSearch(genre);
+  return await searchTracksByGenre(normalizedGenre, limit);
 };
 
 /**
@@ -730,6 +956,12 @@ const getAlbumTracks = async (albumId, market = null) => {
 
 export {
   getTopTracks,
+  getPopularTracks,
+  getTopArtists,
+  getTopGenres,
+  getRecommendations,
+  getGenreTracks,
+  searchTracksByGenre,
   getAudioFeatures,
   fetchTopTracksWithFeatures,
   formatDuration,
