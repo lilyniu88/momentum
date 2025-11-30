@@ -78,7 +78,6 @@ function Activity() {
       <View style={styles.container}>
         <View style={styles.header}>
           <View style={styles.titleContainer}>
-            <FontAwesome5 name="running" size={28} color="#000000" style={styles.titleIcon} solid />
             <Text style={styles.title}>Activity</Text>
           </View>
         </View>
@@ -95,7 +94,6 @@ function Activity() {
       <View style={styles.container}>
         <View style={styles.header}>
           <View style={styles.titleContainer}>
-            <FontAwesome5 name="running" size={28} color="#000000" style={styles.titleIcon} solid />
             <Text style={styles.title}>Activity</Text>
           </View>
         </View>
@@ -108,31 +106,75 @@ function Activity() {
     )
   }
 
-  const renderRunItem = ({ item: run }) => (
-    <Pressable
-      style={styles.runItem}
-      onPress={() => handleRunPress(run)}
-    >
-      <View style={styles.runItemContent}>
-        <View style={styles.runItemLeft}>
-          <MaterialIcons name="directions-run" size={24} color="#5809C0" />
-          <View style={styles.runItemInfo}>
-            <Text style={styles.runItemDate}>{formatDate(run.date)}</Text>
-            <Text style={styles.runItemDistance}>
-              {run.totalDistance ? `${parseFloat(run.totalDistance).toFixed(2)} mi` : '0.00 mi'}
-            </Text>
+  const formatTime = (timeString) => {
+    // Time is already in HH:MM:SS format from RunningPage
+    return timeString || '00:00:00'
+  }
+
+  const formatPace = (paceString) => {
+    // Pace is already in M:SS format
+    return paceString || '0:00'
+  }
+
+  const renderRunItem = ({ item: run }) => {
+    // Calculate average pace if not available
+    const averagePace = run.averagePace || (run.samples && run.samples.length > 0
+      ? (() => {
+          const validPaces = run.samples.filter(s => s.pace > 0).map(s => s.pace)
+          if (validPaces.length === 0) return '0:00'
+          const avgPaceSeconds = validPaces.reduce((sum, p) => sum + p, 0) / validPaces.length
+          const mins = Math.floor(avgPaceSeconds / 60)
+          const secs = Math.floor(avgPaceSeconds % 60)
+          return `${mins}:${String(secs).padStart(2, '0')}`
+        })()
+      : '0:00')
+
+    return (
+      <Pressable
+        style={styles.runItem}
+        onPress={() => handleRunPress(run)}
+      >
+        <View style={styles.runItemContent}>
+          <View style={styles.runItemLeft}>
+            <MaterialIcons name="directions-run" size={24} color="#5809C0" />
+            <View style={styles.runItemInfo}>
+              {/* Date/Day */}
+              <Text style={styles.runItemDate}>{formatDate(run.date)}</Text>
+              
+              {/* Stats in vertical layout */}
+              <View style={styles.runItemStats}>
+                {/* Total Distance */}
+                <View style={styles.runItemStatRow}>
+                  <Text style={styles.runItemStatLabel}>Distance:</Text>
+                  <Text style={styles.runItemStatValue}>
+                    {run.totalDistance ? `${parseFloat(run.totalDistance).toFixed(2)} mi` : '0.00 mi'}
+                  </Text>
+                </View>
+                
+                {/* Total Time */}
+                <View style={styles.runItemStatRow}>
+                  <Text style={styles.runItemStatLabel}>Time:</Text>
+                  <Text style={styles.runItemStatValue}>{formatTime(run.totalTime)}</Text>
+                </View>
+                
+                {/* Average Pace */}
+                <View style={styles.runItemStatRow}>
+                  <Text style={styles.runItemStatLabel}>Avg Pace:</Text>
+                  <Text style={styles.runItemStatValue}>{formatPace(averagePace)} min/mi</Text>
+                </View>
+              </View>
+            </View>
           </View>
+          <MaterialIcons name="chevron-right" size={24} color="#CCCCCC" />
         </View>
-        <MaterialIcons name="chevron-right" size={24} color="#CCCCCC" />
-      </View>
-    </Pressable>
-  )
+      </Pressable>
+    )
+  }
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <View style={styles.titleContainer}>
-          <FontAwesome5 name="running" size={28} color="#000000" style={styles.titleIcon} solid />
           <Text style={styles.title}>Activity</Text>
         </View>
       </View>

@@ -504,26 +504,6 @@ function Playlist({ distance, intensity, onBackToHome, onRunStart, onRunStop }) 
         {/* Spotify Connect Button or Action Buttons */}
         {!authReady ? (
           <View style={styles.spotifyConnectSection}>
-            {authError && (
-              <View style={styles.errorContainer}>
-                <Text style={styles.errorText}>{authError}</Text>
-                {(authError.includes('Missing permissions') || authError.includes('Permissions missing')) ? (
-                  <Text style={styles.redirectUriHint}>
-                    Please reconnect Spotify to grant playback permissions.
-                  </Text>
-                ) : null}
-                {request?.redirectUri && (
-                  <>
-                    <Text style={styles.redirectUriHint}>
-                      Redirect URI: {request.redirectUri}
-                    </Text>
-                    <Text style={styles.redirectUriHint}>
-                      Make sure this EXACT URI is added to your Spotify Dashboard
-                    </Text>
-                  </>
-                )}
-              </View>
-            )}
             {isLoadingSpotify ? (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color="#5809C0" />
@@ -539,11 +519,6 @@ function Playlist({ distance, intensity, onBackToHome, onRunStart, onRunStop }) 
                   <MaterialIcons name="music-note" size={24} color="#FFFFFF" />
                   <Text style={styles.spotifyConnectText}>Connect Spotify</Text>
                 </Pressable>
-                {request?.redirectUri && (
-                  <Text style={styles.redirectUriDisplay}>
-                    Redirect URI: {request.redirectUri}
-                  </Text>
-                )}
               </>
             )}
             <Text style={styles.spotifyConnectHint}>
@@ -580,67 +555,6 @@ function Playlist({ distance, intensity, onBackToHome, onRunStart, onRunStop }) 
                 </View>
         )}
 
-        {/* Show error message even when authenticated */}
-        {authReady && authError && (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>{authError}</Text>
-                  {(authError.includes('Missing permissions') || authError.includes('Permissions missing')) ? (
-                    <>
-                      <Text style={styles.redirectUriHint}>
-                        Please disconnect and reconnect Spotify to grant playback permissions.
-                      </Text>
-                      <Pressable 
-                        style={[styles.spotifyConnectButton, { marginTop: 12, backgroundColor: '#5809C0' }]}
-                        onPress={async () => {
-                          console.log('Disconnecting Spotify...')
-                          await clearTokens()
-                          setAuthReady(false)
-                          setSpotifySongs([])
-                          setAuthError(null)
-                          setHasActiveDevice(null)
-                          console.log('Spotify disconnected. Please reconnect to grant permissions.')
-                        }}
-                      >
-                        <Text style={styles.spotifyConnectText}>Disconnect & Reconnect</Text>
-                      </Pressable>
-                    </>
-                  ) : (authError.includes('Authentication required') || authError.includes('No valid access token')) ? (
-                    <>
-                      <Text style={styles.redirectUriHint}>
-                        Please disconnect and reconnect Spotify.
-                      </Text>
-                      <Pressable 
-                        style={[styles.spotifyConnectButton, { marginTop: 12, backgroundColor: '#5809C0' }]}
-                        onPress={async () => {
-                          console.log('Disconnecting Spotify...')
-                          await clearTokens()
-                          setAuthReady(false)
-                          setSpotifySongs([])
-                          setAuthError(null)
-                          setHasActiveDevice(null)
-                          console.log('Spotify disconnected. Please reconnect to grant permissions.')
-                        }}
-                      >
-                        <Text style={styles.spotifyConnectText}>Disconnect & Reconnect</Text>
-                      </Pressable>
-                    </>
-                  ) : (authError.includes('No active device')) ? (
-                    <Text style={styles.redirectUriHint}>
-                      Open Spotify on your phone, computer, or web player, then try playing again.
-                    </Text>
-                  ) : null}
-            </View>
-        )}
-        
-        {/* Show device status warning */}
-        {authReady && !isLoadingSpotify && hasActiveDevice === false && !authError && (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>No active Spotify device found</Text>
-            <Text style={styles.redirectUriHint}>
-              Open Spotify on your phone, computer, or web player to enable playback.
-            </Text>
-          </View>
-        )}
 
         {/* Loading indicator for Spotify tracks */}
         {authReady && isLoadingSpotify && (

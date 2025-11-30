@@ -109,9 +109,7 @@ function QuickRun({ onRunStart, onRunStop }) {
       >
         <View style={styles.container}>
           <View style={styles.titleContainer}>
-            <FontAwesome5 name="running" size={32} color="#5809C0" style={styles.titleIcon} />
             <Text style={styles.title}>Quick Run</Text>
-            <FontAwesome5 name="home" size={24} color="#5809C0" style={styles.homeIcon} />
           </View>
           
           <View style={styles.filters}>
